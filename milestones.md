@@ -5,10 +5,12 @@ On peut mettre notre initiale à côté de ce qu'on est en train de coder (genre
 ## utils
 Replay buffer (N) fini!
 
-## environment
-* inverted pendulum
+## environment (A)
+* inverted pendulum 
 
 * Reacher-v1
+
+Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_env (pas nécessaire), je fais tourner un random agent dessus, et j’affiche le debut de la simulation.
 
 ## agents
 
