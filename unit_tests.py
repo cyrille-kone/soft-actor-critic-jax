@@ -26,7 +26,7 @@ def test_replay_buffer():
 
     print("sampling transition batch")
     key, rng = jax.random.split(key)
-    batch = buffer.sample_batch(4, rng)
+    batch = buffer.sample_batch(400, rng)
     print(batch.state.shape)
     print(batch)
 
