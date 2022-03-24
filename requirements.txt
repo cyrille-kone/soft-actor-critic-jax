@@ -1,5 +1,5 @@
 jax 
-haiku 
+dm-haiku
 torch 
 numpy 
 matplotlib 

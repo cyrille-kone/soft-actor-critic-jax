@@ -22,4 +22,3 @@ You may decide to run a part of our experiments by executing the command for the
 # TODO 
 https://arxiv.org/abs/1801.01290
 # TODO
-# Test3
