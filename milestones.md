@@ -21,7 +21,7 @@ Replay buffer (N) fini!
 
 * backprop
 
-* main loop (N)
+* main loop (N) (à l'état de brouillon pour l'instant)
 
 ## testing/experiments
 * reproducing results
