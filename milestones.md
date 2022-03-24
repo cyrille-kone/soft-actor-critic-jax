@@ -3,7 +3,7 @@ liste de trucs à faire/coder, je pense on peut mettre l'avancement de ce que ch
 On peut mettre notre initiale à côté de ce qu'on est en train de coder (genre j'ai mis (N) à côté de replay buffer)
 
 ## utils
-Replay buffer (N)
+Replay buffer (N) fini!
 
 ## environment
 * inverted pendulum
@@ -20,6 +20,8 @@ Replay buffer (N)
 * loss function
 
 * backprop
+
+* main loop (N)
 
 ## testing/experiments
 * reproducing results
