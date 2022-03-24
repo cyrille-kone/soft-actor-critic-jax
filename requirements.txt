@@ -3,3 +3,8 @@ dm-haiku
 torch 
 numpy 
 matplotlib 
+gym
+dm-env
+dm-acme[envs]
+chex
+acme
