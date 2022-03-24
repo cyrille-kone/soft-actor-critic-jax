@@ -21,6 +21,9 @@ if __name__ == '__main__':
             agent.record(timestep)
             traj_reward += timestep.reward
 
+            if i % train_every == 0:
+                agent.train()
+
             timestep = timestep_
 
         if traj_reward > best_reward:
