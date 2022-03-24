@@ -43,7 +43,7 @@ def load_config(*argkeys, **IGNORE):
     for (section, key) in argkeys:
         key_value_read = None
         try:
-            key_value_read = eval(config_parser[section][key])
+            key_value_read = config_parser[section][key]
         except KeyError:
             logger.info("Key %s for section %s was not found in the config file", key, section)
         finally:

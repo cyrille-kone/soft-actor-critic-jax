@@ -5,6 +5,7 @@ PyCharm Editor
 """
 import chex
 import acme
+import enum
 # on peut definir tous nos customs type ici
 
 @chex.dataclass

@@ -1,14 +1,13 @@
 # TODO: import agents
 
 if __name__ == '__main__':
-    # make environment env = 
-
+    # make environment env =
     n_trajectories = 200
     # checkpoint_file = 
     # plot file = 
 
     best_reward = 0 # env.reward_spec().minimum() ?  # should be min reward possible
-    load_checkpoint = False  # TODO: make that a command option ?
+    load_checkpoint = False  # TODO: make that a command option ? | maybe we should write a function for that [cyrk]
 
     train_every = 10
 
