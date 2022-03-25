@@ -96,7 +96,7 @@ class ValueNetwork(CustomMLP):
 
 
 class ActorNetwork(CustomMLP):
-    def __init__(self, action_dims,
+    def __init__(self, obs_dims, action_dims,
                  hidden_output_dims=(256, 256),
                  non_linearity='relu',
                  chkpt_dir=None)
