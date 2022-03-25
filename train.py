@@ -1,15 +1,20 @@
-# TODO: import agents
+import envs
+from agents import SACAgent
 
 if __name__ == '__main__':
-    # make environment env =
+    env = envs.PendulumEnv()
     n_trajectories = 200
     # checkpoint_file = 
     # plot file = 
 
+    agent = SACAgent()
+
+
     best_reward = 0 # env.reward_spec().minimum() ?  # should be min reward possible
-    load_checkpoint = False  # TODO: make that a command option ? | maybe we should write a function for that [cyrk]
+    all_rewards = []  # for future plotting
 
     train_every = 10
+    save_every = 100
 
     for i in range(n_trajectories):
         timestep = env.reset()
@@ -21,7 +26,10 @@ if __name__ == '__main__':
             traj_reward += timestep.reward
 
             if i % train_every == 0:
-                agent.train()
+                agent.learner_step()
+
+            if i % save_every == 0:
+                agent.save_checkpoint(chkpt_dir='dir_save/', id=f'{i}')
 
             timestep = timestep_
 
@@ -29,3 +37,4 @@ if __name__ == '__main__':
             best_reward = traj_reward
             print(f"Trajectory\t{i}/{n_trajectories}")
             print(f"Reward \t {traj_reward}, Best \t {best_reward}")
+
