@@ -1,10 +1,11 @@
-jax 
+jax~=0.2.17
 dm-haiku
 torch 
-numpy 
+numpy~=1.19.5
 matplotlib 
-gym
+gym~=0.21.0
 dm-env
 dm-acme[envs]
-chex
-acme
+chex~=0.0.9
+acme~=1.23.0
+imageio~=2.13.1
