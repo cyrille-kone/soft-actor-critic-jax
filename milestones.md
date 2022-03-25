@@ -15,8 +15,7 @@ Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_e
 
 ## agents
 * Fichier agents.py 
-* actor
-* critic
+* Fichier networks.py avec value, critic et actor (en cours) (N) qui seront ensuite utilisés dans agents.py
 
 ## training
 
