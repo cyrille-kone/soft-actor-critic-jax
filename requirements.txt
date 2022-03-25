@@ -9,3 +9,4 @@ dm-acme[envs]
 chex~=0.0.9
 acme~=1.23.0
 imageio~=2.13.1
+free-mujoco-py
