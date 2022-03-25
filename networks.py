@@ -2,10 +2,11 @@ import os
 import jax
 import chex
 import pickle
-import logging
 import haiku as hk
 import jax.numpy as jnp
 from typing import Sequence
+
+from utils import logger
 
 """
 Critic, Value and Actor networks
@@ -48,20 +49,23 @@ class CustomMLP(hk.nets.MLP):
 
     def save_checkpoint(self, file='value_net'):
         """call with a unique filename, otherwise previous file will be overwrited"""
-        logging.info(f'Saving value network to {self.chkpt_dir}/{file}')
+        logger.info(f'Saving value network to {self.chkpt_dir}/{file}')
         self._chkpt_file = file
         with open(os.path.join(self.chkpt_dir, file), 'wb') as f:
             pickle.dump(self.params_dict(), f)
 
     def load_checkpoint(self, file=None):
         """loads last saved checkpoint by default"""
-        logging.info(f'Loading value network from {self.chkpt_dir}/{file}')
+        logger.info(f'Loading value network from {self.chkpt_dir}/{file}')
         if file is None:
             file = self._chkpt_file
+
+        if not os.path.exists(os.path.join(self.chkpt_dir, file)):
+            logger.warning('could not load checkpoint file (file not found)')
+            return None
+
         with open(os.path.join(self.chkpt_dir, file), 'rb') as f:
-            None
-            # TODO check
-            # self.params_dict() = pickle.load(f)
+            self.params_dict() = pickle.load(f)
 
 
 class CriticNetwork(CustomMLP):
