@@ -7,12 +7,9 @@ PyCharm Editor
 import gym
 import chex
 import dm_env
-<<<<<<< HEAD
 import mujoco_py
-=======
 import logging
 import imageio
->>>>>>> 3f94ba403a086af663c3582ade020f40ab518eb0
 import numpy as np
 from acme import specs
 from typing import Optional
