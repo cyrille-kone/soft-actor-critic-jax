@@ -107,7 +107,7 @@ class ActorNetwork(CustomMLP):
             chkpt_dir=chkpt_dir
         )
 
-        self.input_dims = obs_dims
+        self._expected_input_dims = obs_dims
         self.reparam_noise = 1e-6
 
     def __call__(state: chex.Array) -> chex.Array:
