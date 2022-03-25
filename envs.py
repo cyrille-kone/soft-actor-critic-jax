@@ -1,4 +1,4 @@
-# coding=utf-8
+coding=utf-8
 r"""
 PyCharm Editor
 @ git Team
@@ -7,6 +7,7 @@ PyCharm Editor
 import gym
 import chex
 import dm_env
+import mujoco_py
 import logging
 import imageio
 import numpy as np

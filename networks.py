@@ -96,7 +96,7 @@ class ValueNetwork(CustomMLP):
 
 
 class ActorNetwork(CustomMLP):
-    def __init__(self, action_dims,
+    def __init__(self, obs_dims, action_dims,
                  hidden_output_dims=(256, 256),
                  non_linearity='relu',
                  chkpt_dir=None)
@@ -107,7 +107,7 @@ class ActorNetwork(CustomMLP):
             chkpt_dir=chkpt_dir
         )
 
-        self.input_dims = obs_dims
+        self._expected_input_dims = obs_dims
         self.reparam_noise = 1e-6
 
     def __call__(state: chex.Array) -> chex.Array:
