@@ -5,6 +5,7 @@ PyCharm Editor
 """
 import logging
 import configparser
+from pathlib import Path
 from typing import Optional, List
 
 # configure logger for the module
@@ -31,10 +32,11 @@ def load_config(*argkeys, **IGNORE):
      >>> load_config(("DEFAULT", "BATCH_SIZE"), ("DEFAULT", "LR"))
     '''
     config_parser = configparser.ConfigParser()
+    config_file_path = Path(__file__).parent / "config.ini"
     # This function does not raise an exception
     # Even if the file does not exist
     # Instead it return an empty list
-    is_file_read = config_parser.read("config.ini")
+    is_file_read = config_parser.read(config_file_path)
     if not is_file_read:
         logger.warning('Config file not found !')
         # we should return nothing
@@ -45,8 +47,7 @@ def load_config(*argkeys, **IGNORE):
         try:
             key_value_read = config_parser[section][key]
         except KeyError:
-            logger.info("Key %s for section %s was not found in the config file", key, section)
+            logger.error("Key %s for section %s was not found in the config file", key, section)
         finally:
             key_values += [key_value_read]
     return key_values
-

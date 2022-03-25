@@ -7,9 +7,18 @@ PyCharm Editor
 import gym
 import chex
 import dm_env
+import logging
+import imageio
 import numpy as np
 from acme import specs
 from typing import Optional
+
+# configure logger for the module
+logger = logging.getLogger(__name__)
+# create console handler
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
 
 
 class MixinEnv(dm_env.Environment):
@@ -21,6 +30,23 @@ class MixinEnv(dm_env.Environment):
     def close(self) -> None:
         if hasattr(self, "_env"):
             self._env.close()
+
+    def save_video(self, filename, frame_repeat):
+        if not hasattr(self, "screen"):
+            logger.warning("No screen set for this environment")
+        # if the frame list is empty
+        if not self.screen:
+            # no frame saved
+            logger.error("No frames saved for this environment")
+        with imageio.get_writer(filename, fps=60) as video:
+            for frame in self.screen:
+                for _ in range(frame_repeat):
+                    video.append_data(frame)
+            # Read video and display the video
+        video = open(filename, 'rb').read()
+        return video # TODO essayer pour voir si ça vaut la peine de retourner video
+
+
 
     def reset(self) -> dm_env.TimeStep:
         obs = self._env.reset()
