@@ -7,6 +7,7 @@ PyCharm Editor
 import gym
 import chex
 import dm_env
+import mujoco_py
 import numpy as np
 from acme import specs
 from typing import Optional

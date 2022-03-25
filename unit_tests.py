@@ -1,4 +1,5 @@
 from replay_buffer import ReplayBuffer
+import envs
 import jax
 
 seed = 0
@@ -30,6 +31,13 @@ def test_replay_buffer():
     print(batch.state.shape)
     print(batch)
 
+def test_environments():
+    print("creating the environments...")
+    pendulum_env = envs.PendulumEnv
+    reacher_env = envs.ReacherEnv(for_evaluation=True)
+    invertedpendulum_env = envs.InvertedPendulumEnv(for_evaluation=False)
+
 
 if __name__=="__main__":
-    test_replay_buffer()
+    #test_replay_buffer()
+    test_environments()
