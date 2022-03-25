@@ -7,7 +7,7 @@ import abc
 import acme
 import chex
 from typing import Mapping
-from types import Trajectory
+from new_types import Trajectory
 
 # A very simple agent API, with just enough to interact with the environment
 # and to update its potential parameters.
