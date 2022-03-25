@@ -33,7 +33,7 @@ def test_replay_buffer():
 
 def test_environments():
     print("creating the environments...")
-    pendulum_env = envs.PendulumEnv
+    pendulum_env = envs.PendulumEnv(for_evaluation=False)
     reacher_env = envs.ReacherEnv(for_evaluation=True)
     invertedpendulum_env = envs.InvertedPendulumEnv(for_evaluation=False)
 
