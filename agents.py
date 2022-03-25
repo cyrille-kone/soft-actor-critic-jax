@@ -31,3 +31,5 @@ class Agent(object):
         pass
 
 
+class SACAgent(Agent):
+    pass
