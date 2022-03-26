@@ -7,9 +7,11 @@ import abc
 import acme
 import chex
 from typing import Mapping
-from new_types import Trajectory
 
+from new_types import Trajectory
 from networks import ValueNetwork, CriticNetwork, ActorNetwork
+from replay_buffer import ReplayBuffer
+
 
 # A very simple agent API, with just enough to interact with the environment
 # and to update its potential parameters.
@@ -47,6 +49,7 @@ class SACAgent(Agent):
 
         obs_dims = obs_spec().shape[-1]
         action_dims = action_spec().shape[-1]
+        self.memory = ReplayBuffer(obs_dims, action_dims)
 
         self.value_target = ValueNetwork(obs_dims,
                                          hidden_output_dims=hidden_output_dims,
@@ -97,3 +100,19 @@ class SACAgent(Agent):
 
         return actions, log_probs
 
+    # TODO
+    def store_transition(self, state, action, reward, next_state, done):
+        pass
+
+    def update_target_network(self, tau=None):
+        """soft update of network parameters"""
+        pass
+
+    def save_checkpoint(chkpt_dir):
+        pass
+
+    def load_checkpoint(chkpt_dir):
+        pass
+
+    def learner_step():
+        pass
