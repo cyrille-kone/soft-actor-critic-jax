@@ -14,8 +14,8 @@ On peut mettre notre initiale à côté de ce qu'on est en train de coder (genre
 Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_env (pas nécessaire), je fais tourner un random agent dessus, et j’affiche le debut de la simulation.
 
 ## agents
-* Fichier agents.py 
-* Fichier networks.py avec value, critic et actor (en cours) (N) qui seront ensuite utilisés dans agents.py
+* Fichier agents.py -> en cours (N)
+* Fichier networks.py avec value, critic et actor -> fini (mais pas testé) (N) qui seront ensuite utilisés dans agents.py
 
 ## training
 
