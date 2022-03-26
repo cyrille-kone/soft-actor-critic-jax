@@ -38,33 +38,34 @@ class CustomMLP(hk.nets.MLP):
                 os.mkdir(chkpt_dir)
 
         self.chkpt_dir = chkpt_dir
-        self._chkpt_file = None  # will be set when saving
+        self.chkpt_file = None           # will be set when saving
 
-        self._expected_input_dims = None       # should be set in child classes
+        self._expected_input_dims = None  # should be set in child classes
 
     def __call__(x: chex.Array) -> chex.Array:
         assert x.shape[1] == self._expected_input_dims,
         "input dimension {x.shape} doesn't match expected dimension [batch_size, {self._expected_input_dims}]"
         return super().__call__(x)
 
-    def save_checkpoint(self, file='value_net'):
+    def save_checkpoint(self, file=None):
         """call with a unique filename, otherwise previous file will be overwrited"""
         logger.info(f'Saving value network to {self.chkpt_dir}/{file}')
-        self._chkpt_file = file
-        with open(os.path.join(self.chkpt_dir, file), 'wb') as f:
+        if file is not None:
+            self.chkpt_file = file
+        with open(os.path.join(self.chkpt_dir, self.chkpt_file), 'wb') as f:
             pickle.dump(self.params_dict(), f)
 
     def load_checkpoint(self, file=None):
         """loads last saved checkpoint by default"""
         logger.info(f'Loading value network from {self.chkpt_dir}/{file}')
-        if file is None:
-            file = self._chkpt_file
+        if file is not None:
+            self.chkpt_file = file
 
-        if not os.path.exists(os.path.join(self.chkpt_dir, file)):
+        if not os.path.exists(os.path.join(self.chkpt_dir, self.chkpt_file)):
             logger.warning('could not load checkpoint file (file not found)')
             return None
 
-        with open(os.path.join(self.chkpt_dir, file), 'rb') as f:
+        with open(os.path.join(self.chkpt_dir, self.chkpt_file), 'rb') as f:
             self.params_dict() = pickle.load(f)
 
 
@@ -81,6 +82,7 @@ class CriticNetwork(CustomMLP):
 
         self._expected_input_dims = obs_dims+action_dims  # to assert correct input dims
 
+
 class ValueNetwork(CustomMLP):
     def __init__(self, obs_dims: int,
                  hidden_output_dims=(256, 256),
@@ -96,7 +98,7 @@ class ValueNetwork(CustomMLP):
 
 
 class ActorNetwork(CustomMLP):
-    def __init__(self, obs_dims, action_dims,
+    def __init__(self, obs_dims: int, action_dims: int,
                  hidden_output_dims=(256, 256),
                  non_linearity='relu',
                  chkpt_dir=None)
@@ -113,7 +115,11 @@ class ActorNetwork(CustomMLP):
     def __call__(state: chex.Array) -> chex.Array:
         h = super().__call__(state)
         mu, log_sigma = jnp.split(h, 2, axis=-1)
+
+        # TODO: these next are present in other implementations, 
+        # but i don't see where they are explained in the paper ?
+
         log_sigma = jax.nn.softplus(log_sigma)
-        # log_sigma = jnp.clip(log_sigma, min=jnp.log(self.reparam_noise))
+        # log_sigma = jnp.clip(log_sigma, min=jnp.log(self.reparam_noise))  # prevent -inf values
         return mu, log_sigma  # need to reshape that ?
 
