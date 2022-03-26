@@ -40,6 +40,7 @@ class SACAgent(Agent):
                  rng,
                  obs_spec,
                  action_spec,
+                 batch_size=256,
                  lr=3e-4,  # same for all networks
                  hidden_output_dims = (256, 256),
                  gamma=0.99,
@@ -51,26 +52,42 @@ class SACAgent(Agent):
         action_dims = action_spec().shape[-1]
         self.memory = ReplayBuffer(obs_dims, action_dims)
 
-        self.value_target = ValueNetwork(obs_dims,
-                                         hidden_output_dims=hidden_output_dims,
-                                         chkpt_dir=chkpt_dir)
-        self.value = ValueNetwork(obs_dims,
+        value = ValueNetwork(obs_dims,
                                   hidden_output_dims=hidden_output_dims,
                                   chkpt_dir=chkpt_dir)
-        self.critic = CriticNetwork(obs_dims,
+        critic = CriticNetwork(obs_dims,
                                     action_dims,
                                     hidden_output_dims=hidden_output_dims,
                                     chkpt_dir=chkpt_dir)
-        self.actor = ActorNetwork(obs_dims,
+        critic_target = CriticNetwork(obs_dims,
+                                          action_dims,
+                                          hidden_output_dims=hidden_output_dims,
+                                          chkpt_dir=chkpt_dir)
+        actor = ActorNetwork(obs_dims,
                                   action_dims,
                                   hidden_output_dims=hidden_output_dims,
                                   chkpt_dir=chkpt_dir)
 
         self.rng = rng
+        self.value =         hk.without_apply_rng(hk.transform(value))
+        self.critic =        hk.without_apply_rng(hk.transform(critic))
+        self.critic_target = hk.without_apply_rng(hk.transform(critic_target))
+        self.actor =         hk.without_apply_rng(hk.transform(actor))
+
         self.obs_spec = obs_spec
         self.action_spec = action_spec
+        self.gamma = gamma
+
+        # intialize networks parameters
+        self.rng, actor_key, critic_key, value_key = jax.random.split(self.rng, 4)
+
+        self.value.params = self.value.init(value_key, obs_spec())
+        self.critic.params = self.critic_target.params = \
+                self.value.init(critic_key, jnp.concatenate(obs_spec(), action_spec()))
+        self.actor.params = self.value.init(value_key, obs_spec())
 
 
+    # is this supposed to be batched_actor_step ?
     def select_actions(observations: chex.Array) -> chex.Array:
         """
         observations: chex.Array
@@ -82,7 +99,10 @@ class SACAgent(Agent):
         return: actions, log_probs
         """
         rng, key = jax.random.split(rng, 2)
-        mus, log_sigmas = self.actor(observations)
+        mus, log_sigmas = self.actor.apply(self.actor.params, observations)
+
+        # see appendix C in SAC paper
+
         # sample actions according to normal distributions
         actions = jax.random.multivariate_normal(key, mus, jnp.diag(jnp.exp(sigmas)))
 
@@ -115,4 +135,15 @@ class SACAgent(Agent):
         pass
 
     def learner_step():
+        # get batch of transitions
+        self.rng, key = jnp.split(self.rng, 2)
+        batch = self.memory.sample_batch(batch_size=self.batch_size, key)
+
+        # compute value, q and actions
+        value = self.value.apply(self.value.params, batch.state)
+        critic = self.value.apply(self.critic.params, jnp.concatenate(batch.state, batch.actions, axis=1)
+        actions, log_probs = self.select_actions(batch.state)
+
+
+
         pass

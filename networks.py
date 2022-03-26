@@ -41,6 +41,7 @@ class CustomMLP(hk.nets.MLP):
         self.chkpt_file = None           # will be set when saving
 
         self._expected_input_dims = None  # should be set in child classes
+        self.params = None  # to be set when using hk.transform
 
     def __call__(x: chex.Array) -> chex.Array:
         assert x.shape[1] == self._expected_input_dims,
@@ -116,10 +117,10 @@ class ActorNetwork(CustomMLP):
         h = super().__call__(state)
         mu, log_sigma = jnp.split(h, 2, axis=-1)
 
-        # TODO: these next are present in other implementations, 
+        # TODO: these next lines are present in other implementations, 
         # but i don't see where they are explained in the paper ?
 
-        log_sigma = jax.nn.softplus(log_sigma)
+        log_sigma = jax.nn.softplus(log_sigma)  # soft relu
         # log_sigma = jnp.clip(log_sigma, min=jnp.log(self.reparam_noise))  # prevent -inf values
         return mu, log_sigma  # need to reshape that ?
 
