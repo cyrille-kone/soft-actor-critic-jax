@@ -24,9 +24,9 @@ class ReplayBuffer():
                                        next_state=next_state,
                                        done=done))
 
-    def sample_batch(self, batch_size: int, rng: jnp.ndarray) -> Transition:
+    def sample_batch(self, batch_size: int, rng) -> Transition:
         """Returns a Transition of batches"""
-        indices = jax.random.randint(rng, (batch_size,), 0, len(self._memory))
+        indices = jax.random.randint(rng, (batch_size,), 0, len(self._memory)-1)
 
         states = []
         actions = []

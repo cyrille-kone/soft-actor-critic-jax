@@ -5,7 +5,10 @@ PyCharm Editor
 """
 import abc
 import acme
+import jax
+import jax.numpy as jnp
 import chex
+import haiku as hk
 from typing import Mapping
 
 from new_types import Trajectory
@@ -48,47 +51,50 @@ class SACAgent(Agent):
                  target_update=1000,
                  chkpt_dir=None):
 
-        obs_dims = obs_spec().shape[-1]
-        action_dims = action_spec().shape[-1]
+        obs_dims = obs_spec().shape[0]
+        action_dims = action_spec().shape[0]
         self.memory = ReplayBuffer(obs_dims, action_dims)
 
-        value = ValueNetwork(obs_dims,
-                                  hidden_output_dims=hidden_output_dims,
-                                  chkpt_dir=chkpt_dir)
-        critic = CriticNetwork(obs_dims,
-                                    action_dims,
-                                    hidden_output_dims=hidden_output_dims,
-                                    chkpt_dir=chkpt_dir)
-        critic_target = CriticNetwork(obs_dims,
+        self.value = hk.without_apply_rng(hk.transform(lambda x:
+                            ValueNetwork(obs_dims,
+                                         hidden_output_dims=hidden_output_dims,
+                                         chkpt_dir=chkpt_dir)(x)))
+        self.critic = hk.without_apply_rng(hk.transform(lambda x:
+                            CriticNetwork(obs_dims,
                                           action_dims,
                                           hidden_output_dims=hidden_output_dims,
-                                          chkpt_dir=chkpt_dir)
-        actor = ActorNetwork(obs_dims,
-                                  action_dims,
-                                  hidden_output_dims=hidden_output_dims,
-                                  chkpt_dir=chkpt_dir)
+                                          chkpt_dir=chkpt_dir)(x)))
+        self.critic_target = hk.without_apply_rng(hk.transform(lambda x:
+                            CriticNetwork(obs_dims,
+                                          action_dims,
+                                          hidden_output_dims=hidden_output_dims,
+                                          chkpt_dir=chkpt_dir)(x)))
+        self.actor = hk.without_apply_rng(hk.transform(lambda x:
+                            ActorNetwork(obs_dims,
+                                         action_dims,
+                                         hidden_output_dims=hidden_output_dims,
+                                         chkpt_dir=chkpt_dir)(x)))
 
         self.rng = rng
-        self.value =         hk.without_apply_rng(hk.transform(value))
-        self.critic =        hk.without_apply_rng(hk.transform(critic))
-        self.critic_target = hk.without_apply_rng(hk.transform(critic_target))
-        self.actor =         hk.without_apply_rng(hk.transform(actor))
 
         self.obs_spec = obs_spec
         self.action_spec = action_spec
+        self.batch_size = batch_size
         self.gamma = gamma
 
-        # intialize networks parameters
+        # initialize networks parameters
         self.rng, actor_key, critic_key, value_key = jax.random.split(self.rng, 4)
 
-        self.value.params = self.value.init(value_key, obs_spec())
-        self.critic.params = self.critic_target.params = \
-                self.value.init(critic_key, jnp.concatenate(obs_spec(), action_spec()))
-        self.actor.params = self.value.init(value_key, obs_spec())
+        dummy_obs = jnp.ones(obs_spec().shape)
+        dummy_action = jnp.ones(action_spec().shape)
+        self.value_params = self.value.init(value_key, dummy_obs)
+        self.critic_params = self.critic_target_params = \
+                self.critic.init(critic_key, jnp.concatenate((dummy_obs, dummy_action)))
+        self.actor_params = self.actor.init(value_key, dummy_obs)
 
 
     # is this supposed to be batched_actor_step ?
-    def select_actions(observations: chex.Array) -> chex.Array:
+    def select_actions(self, observations: chex.Array) -> chex.Array:
         """
         observations: chex.Array
                 batch of states
@@ -98,19 +104,19 @@ class SACAgent(Agent):
         also computes log_probs, to compute loss function
         return: actions, log_probs
         """
-        rng, key = jax.random.split(rng, 2)
-        mus, log_sigmas = self.actor.apply(self.actor.params, observations)
+        self.rng, key = jax.random.split(self.rng, 2)
+        mus, log_sigmas = self.actor.apply(self.actor_params, observations)
 
         # see appendix C in SAC paper
 
         # sample actions according to normal distributions
-        actions = jax.random.multivariate_normal(key, mus, jnp.diag(jnp.exp(sigmas)))
+        actions = jax.random.multivariate_normal(key, mus, jnp.array([jnp.diag(jnp.exp(s)) for s in log_sigmas]))
 
         # compute log_likelihood of the sampled actions
-        log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/(2*jnp.exp(sigmas)))**2
+        log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/(2*jnp.exp(log_sigmas)))**2
 
         # squash actions to enforce action bounds
-        actions = jnp.tanh(actions) * (self.action_spec().maximum() - self.action_spec().minimum())
+        actions = jnp.tanh(actions) * (self.action_spec().maximum - self.action_spec().minimum)
 
         # compute squashed log-likelihood
         # ! other implementations put a relu in the log
@@ -120,8 +126,23 @@ class SACAgent(Agent):
 
         return actions, log_probs
 
+    def select_action(self, obs: chex.Array) -> chex.Array:
+        """
+        obs: chex.Array
+                a single observation
+        returns a single action sampled from actor's  distribution
+
+        This is meant to be used while interacting with the environment
+        """
+        action, _ = self.select_actions(jnp.expand_dims(obs, 0))
+        return action.squeeze(axis=0)
+
+    def record(self, t, action, t_):
+        self.store_transition(t.observation, action, t_.reward, t_.observation, t_.step_type=='LAST')
+
     # TODO
     def store_transition(self, state, action, reward, next_state, done):
+        """strores transition in replay buffer"""
         pass
 
     def update_target_network(self, tau=None):
@@ -129,21 +150,21 @@ class SACAgent(Agent):
         pass
 
     def save_checkpoint(chkpt_dir):
+        """uses networks save_checkpoint methods"""
         pass
 
     def load_checkpoint(chkpt_dir):
         pass
 
-    def learner_step():
+    def learner_step(self):
         # get batch of transitions
-        self.rng, key = jnp.split(self.rng, 2)
-        batch = self.memory.sample_batch(batch_size=self.batch_size, key)
+        self.rng, key = jax.random.split(self.rng, 2)
+        batch = self.memory.sample_batch(self.batch_size, key)
 
         # compute value, q and actions
-        value = self.value.apply(self.value.params, batch.state)
-        critic = self.value.apply(self.critic.params, jnp.concatenate(batch.state, batch.actions, axis=1)
+        value = self.value.apply(self.value_params, batch.state)
+        critic = self.critic.apply(self.critic_params, jnp.concatenate(batch.state, batch.actions, axis=1))
         actions, log_probs = self.select_actions(batch.state)
+        return 0
 
 
-
-        pass

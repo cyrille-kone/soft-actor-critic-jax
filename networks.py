@@ -41,11 +41,10 @@ class CustomMLP(hk.nets.MLP):
         self.chkpt_file = None           # will be set when saving
 
         self._expected_input_dims = None  # should be set in child classes
-        self.params = None  # to be set when using hk.transform
 
-    def __call__(x: chex.Array) -> chex.Array:
-        assert x.shape[1] == self._expected_input_dims,
-        "input dimension {x.shape} doesn't match expected dimension [batch_size, {self._expected_input_dims}]"
+    def __call__(self, x: chex.Array) -> chex.Array:
+        assert x.shape[-1] == self._expected_input_dims,\
+        f"input dimension {x.shape} doesn't match expected dimension [batch_size, {self._expected_input_dims}]"
         return super().__call__(x)
 
     def save_checkpoint(self, file=None):
@@ -67,13 +66,14 @@ class CustomMLP(hk.nets.MLP):
             return None
 
         with open(os.path.join(self.chkpt_dir, self.chkpt_file), 'rb') as f:
-            self.params_dict() = pickle.load(f)
+            print(self.params_dict)
+            self.params_dict = pickle.load(f)
 
 
 class CriticNetwork(CustomMLP):
     def __init__(self, obs_dims: int, action_dims: int,
                  hidden_output_dims=(256, 256),
-                 non_linearity: str = 'relu'
+                 non_linearity: str = 'relu',
                  chkpt_dir: str = None):
         super().__init__(
             output_sizes=(*hidden_output_dims, 1),
@@ -87,7 +87,7 @@ class CriticNetwork(CustomMLP):
 class ValueNetwork(CustomMLP):
     def __init__(self, obs_dims: int,
                  hidden_output_dims=(256, 256),
-                 non_linearity: str = 'relu'
+                 non_linearity: str = 'relu',
                  chkpt_dir: str = None):
         super().__init__(
             output_sizes=(*hidden_output_dims, 1),
@@ -102,7 +102,7 @@ class ActorNetwork(CustomMLP):
     def __init__(self, obs_dims: int, action_dims: int,
                  hidden_output_dims=(256, 256),
                  non_linearity='relu',
-                 chkpt_dir=None)
+                 chkpt_dir=None):
 
         super().__init__(
             output_sizes=(*hidden_output_dims, 2*action_dims),
@@ -113,7 +113,7 @@ class ActorNetwork(CustomMLP):
         self._expected_input_dims = obs_dims
         self.reparam_noise = 1e-6
 
-    def __call__(state: chex.Array) -> chex.Array:
+    def __call__(self, state: chex.Array) -> chex.Array:
         h = super().__call__(state)
         mu, log_sigma = jnp.split(h, 2, axis=-1)
 

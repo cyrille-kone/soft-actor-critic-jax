@@ -1,4 +1,4 @@
-coding=utf-8
+#coding:utf-8
 r"""
 PyCharm Editor
 @ git Team
@@ -7,12 +7,17 @@ PyCharm Editor
 import gym
 import chex
 import dm_env
-import mujoco_py
 import logging
 import imageio
 import numpy as np
 from acme import specs
 from typing import Optional
+
+try:
+    import mujoco_py
+except Exception:
+    print("Could not load mujoco")
+
 
 # configure logger for the module
 logger = logging.getLogger(__name__)
@@ -59,7 +64,7 @@ class MixinEnv(dm_env.Environment):
 class PendulumEnv(MixinEnv):
     def __init__(self, for_evaluation: bool) -> None:
         super().__init__(for_evaluation)
-        self._env = gym.make('Pendulum-v0')
+        self._env = gym.make('Pendulum-v1')
         self._for_evaluation = for_evaluation
         if self._for_evaluation:
             self.screens = []
