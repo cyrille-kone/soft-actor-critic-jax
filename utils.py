@@ -7,6 +7,7 @@ import logging
 import configparser
 from pathlib import Path
 from typing import Optional, List
+import jax.numpy as jnp
 
 # configure logger for the module
 logger = logging.getLogger(__name__)
@@ -51,3 +52,6 @@ def load_config(*argkeys, **IGNORE):
         finally:
             key_values += [key_value_read]
     return key_values
+
+def mse_loss(x, y):
+    return jnp.mean(jnp.square(x - y))

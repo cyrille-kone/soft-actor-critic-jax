@@ -15,6 +15,7 @@ from typing import Mapping
 from new_types import Trajectory
 from networks import ValueNetwork, CriticNetwork, ActorNetwork
 from replay_buffer import ReplayBuffer
+from utils import mse_loss
 
 
 # A very simple agent API, with just enough to interact with the environment
@@ -56,6 +57,7 @@ class SACAgent(Agent):
         action_dims = action_spec().shape[0]
         self.memory = ReplayBuffer(obs_dims, action_dims)
 
+        print("initializing networks")
         self.value = hk.without_apply_rng(hk.transform(lambda x:
                             ValueNetwork(obs_dims,
                                          hidden_output_dims=hidden_output_dims,
@@ -88,9 +90,10 @@ class SACAgent(Agent):
         self.action_spec = action_spec
         self.batch_size = batch_size
         self.gamma = gamma
+        self.tau = tau
 
         # initialize networks parameters
-        self.rng, value_key, Q1_key, Q2_key, actor_key = jax.random.split(self.rng, 4)
+        self.rng, value_key, Q1_key, Q2_key, actor_key = jax.random.split(self.rng, 5)
 
         dummy_obs = jnp.ones(obs_spec().shape)
         dummy_action = jnp.ones(action_spec().shape)
@@ -156,12 +159,7 @@ class SACAgent(Agent):
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
-        self.store_transition(t.observation, action, t_.reward, t_.observation, t_.step_type=='LAST')
-
-    # TODO
-    def store_transition(self, state, action, reward, next_state, done):
-        """strores transition in replay buffer"""
-        pass
+        self.memory.store_transition(t.observation, action, t_.reward, t_.observation, t_.step_type)
 
     def update_target_network(self, tau=None):
         """soft update of network parameters"""
@@ -174,50 +172,68 @@ class SACAgent(Agent):
     def load_checkpoint(chkpt_dir):
         pass
 
+    def value_loss(self, params, value, target):
+        return 0.5*mse_loss(value, target)
+
+    def actor_loss(self, params, log_probs, q):
+        return (log_probs - q).mean()
+
+    def critic_loss(self, params, q, q_hat):
+        return 0.5*mse_loss(q, q_hat)
+
     def learner_step(self):
         # get batch of transitions
         self.rng, key = jax.random.split(self.rng, 2)
         batch = self.memory.sample_batch(self.batch_size, key)
 
-        # compute actions and log_probs
+        # compute actions and log_probs from current policy
         actions, log_probs = self.select_actions(batch.state)
 
         # get minimum Q value (see end of 4.2 in the paper)
-        state_action_input = jnp.concatenate(batch.state, batch.actions, axis=1)
+        # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
+        state_action_input = jnp.concatenate((batch.state, actions), axis=1)
         q1 = jax.lax.stop_gradient(self.Q1.apply(self.Q1_params, state_action_input))
         q2 = jax.lax.stop_gradient(self.Q2.apply(self.Q2_params, state_action_input))
         q = jnp.minimum(q1, q2)
 
-        # get q_hat (see eq. 8 in paper)
-        q_hat = batch.reward + (1-batch.done)*self.gamma\
-                self.value_target.apply(self.value_target_params, batch.next_state)
-
-        # compute value, q and
+        # compute value
         value = self.value.apply(self.value_params, batch.state)
-        critic = self.critic.apply(self.critic_params, jnp.concatenate(batch.state, batch.actions, axis=1))
 
-        # update agents
-
-        # TODO: implement self.value_loss_fn
-        value_grads = jax.grads(self.value_loss_fn)(self.value_params, batch.state)
+        # compute value gradients and update value network
+        value_grads = jax.grad(self.value_loss)(self.value_params, value, q-log_probs)
         value_updates, self.value_opt_state = self.value_opt.update(value_grads, self.value_opt_state)
         self.value_params = optax.apply_updates(self.value_params, value_updates)
 
-        # TODO: implement self.Q_loss_fn
-        q1_grads = jax.grad(self.Q_loss_fn)(self.Q1_params, state_action_input)
-        q1_updates, self.Q1_opt_state = self.Q1_opt.update(Q1_grads, self.Q1_opt_state)
-        self.Q1_params = optax.apply_updates(self.Q1_params, Q1_updates)
+        # !! I didn't understand what the "reparameterization trick" was so I didn't code it yet
 
-        q2_grads = jax.grad(self.Q_loss_fn)(self.Q2_params, state_action_input)
-        q2_updates, self.Q2_opt_state = self.Q2_opt.update(Q2_grads, self.Q2_opt_state)
-        self.Q2_params = optax.apply_updates(self.Q2_params, Q2_updates)
-
-        # TODO: implement self.actor_loss_fn
-        actor_grads = jax.grads(self.actor_loss_fn)(self.actor_params, batch.state)
+        # compute actor gradients and update actor network
+        actor_loss, actor_grads = jax.value_and_grad(self.actor_loss)(self.actor_params, log_probs, q)
         actor_updates, self.actor_opt_state = self.actor_opt.update(actor_grads, self.actor_opt_state)
         self.actor_params = optax.apply_updates(self.actor_params, actor_updates)
 
+        # get q_hat (see eq. 8 in paper)
+        q_hat = batch.reward + (1-batch.done)*self.gamma*\
+                self.value_target.apply(self.value_target_params, batch.next_state)
 
-        return 0
+        # compute q (use actions from replay buffer this time (paper eq. 7))
+        state_action_input = jnp.concatenate((batch.state, batch.action), axis=1)
+        q1_r = self.Q1.apply(self.Q1_params, state_action_input)  # _r is for replay buffer
+        q2_r = self.Q2.apply(self.Q2_params, state_action_input)
 
+        # compute q gradients and update critic networks
+        q1_grads = jax.grad(self.critic_loss)(self.Q1_params, q1_r, q_hat)
+        q1_updates, self.Q1_opt_state = self.Q1_opt.update(q1_grads, self.Q1_opt_state)
+        self.Q1_params = optax.apply_updates(self.Q1_params, q1_updates)
+
+        q2_grads = jax.grad(self.critic_loss)(self.Q2_params, q2_r, q_hat)
+        q2_updates, self.Q2_opt_state = self.Q2_opt.update(q2_grads, self.Q2_opt_state)
+        self.Q2_params = optax.apply_updates(self.Q2_params, q2_updates)
+
+        # soft-update target value network parameters 
+        # jax.tree_multimap applies update recursively to weight and biases of the layers of the networks
+        self.value_target_params = jax.tree_multimap(
+            lambda params, target_params: self.tau*params + (1-self.tau)*target_params,
+            self.value_params, self.value_target_params)
+
+        return actor_loss
 
