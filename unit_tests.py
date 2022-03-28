@@ -2,6 +2,7 @@ from replay_buffer import ReplayBuffer
 import jax
 
 seed = 0
+# [cyrk] J'ai plagié :) le test dans tests/test_replay_buffer
 
 def test_replay_buffer():
     print("creating replay buffer...")
@@ -19,9 +20,9 @@ def test_replay_buffer():
 
         buffer.store_transition(obs, action, reward, next_state, done)
 
-        if i==0:
+        if i == 0:
             first_obs = obs
-        if i==buffer.max_length:
+        if i == buffer.max_length:
             assert buffer._memory[0] != first_obs
 
     print("sampling transition batch")
@@ -31,5 +32,5 @@ def test_replay_buffer():
     print(batch)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     test_replay_buffer()

@@ -1,6 +1,6 @@
 # coding=utf-8
 r"""
-@git  cyrille-kone
+@git  Team
 PyCharm Editor
 """
 import logging

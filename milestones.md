@@ -1,4 +1,12 @@
 # Milestones
+# PRIORITE 
+- FAIRE CONVERGER 
+# Compte rendu Re
+- Faire fonctionner et voir convergence 
+- Reproduire les resultats sur Reacher-V1 et Inverted-Pendulum sur 100k timsteps.
+- Finaliser les TU 
+- verifier Documentation 
+- Ecrire rapport 
 liste de trucs à faire/coder, je pense on peut mettre l'avancement de ce que chacun est en train de faire, les problèmes qu'on rencontre etc...
 On peut mettre notre initiale à côté de ce qu'on est en train de coder (genre j'ai mis (N) à côté de replay buffer)
 
