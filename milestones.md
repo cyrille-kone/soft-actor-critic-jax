@@ -25,6 +25,7 @@ Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_e
 * main loop (N) fini!
 
 ## testing/experiments
+
 * dossier ./tests pour rassembler nos tests 
 * reproducing results
 * ablation study ?
