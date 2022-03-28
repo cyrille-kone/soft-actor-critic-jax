@@ -142,7 +142,7 @@ class SACAgent(Agent):
         # compute squashed log-likelihood
         # ! other implementations put a relu in the log
         # + 1e-6 to prevent log(0)
-        log_probs -= jnp.sum(jnp.log(1 - jnp.tanh(actions)**2 + 1e-6), axis=1)
+        log_probs -= jnp.sum(jnp.log(1 - jnp.tanh(actions)**2 + 1e-6), axis=1, keepdims=True)
 
 
         return actions, log_probs
