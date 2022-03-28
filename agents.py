@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 import chex
 import haiku as hk
+import optax  # for adam optimizer
 from typing import Mapping
 
 from new_types import Trajectory
@@ -59,12 +60,18 @@ class SACAgent(Agent):
                             ValueNetwork(obs_dims,
                                          hidden_output_dims=hidden_output_dims,
                                          chkpt_dir=chkpt_dir)(x)))
-        self.critic = hk.without_apply_rng(hk.transform(lambda x:
+        self.value_target = hk.without_apply_rng(hk.transform(lambda x:
+                            ValueNetwork(obs_dims,
+                                         hidden_output_dims=hidden_output_dims,
+                                         chkpt_dir=chkpt_dir)(x)))
+
+        # we use two distinct Q networks (see end of 4.2 in the paper)
+        self.Q1 = hk.without_apply_rng(hk.transform(lambda x:
                             CriticNetwork(obs_dims,
                                           action_dims,
                                           hidden_output_dims=hidden_output_dims,
                                           chkpt_dir=chkpt_dir)(x)))
-        self.critic_target = hk.without_apply_rng(hk.transform(lambda x:
+        self.Q2 = hk.without_apply_rng(hk.transform(lambda x:
                             CriticNetwork(obs_dims,
                                           action_dims,
                                           hidden_output_dims=hidden_output_dims,
@@ -83,14 +90,25 @@ class SACAgent(Agent):
         self.gamma = gamma
 
         # initialize networks parameters
-        self.rng, actor_key, critic_key, value_key = jax.random.split(self.rng, 4)
+        self.rng, value_key, Q1_key, Q2_key, actor_key = jax.random.split(self.rng, 4)
 
         dummy_obs = jnp.ones(obs_spec().shape)
         dummy_action = jnp.ones(action_spec().shape)
-        self.value_params = self.value.init(value_key, dummy_obs)
-        self.critic_params = self.critic_target_params = \
-                self.critic.init(critic_key, jnp.concatenate((dummy_obs, dummy_action)))
+        self.value_params = self.value_target_params = self.value.init(value_key, dummy_obs)
+        self.Q1_params = self.Q1.init(Q1_key, jnp.concatenate((dummy_obs, dummy_action)))
+        self.Q2_params = self.Q2.init(Q2_key, jnp.concatenate((dummy_obs, dummy_action)))
         self.actor_params = self.actor.init(value_key, dummy_obs)
+
+        # create and initialize optimizers
+        self.value_opt = optax.adam(lr)
+        self.Q1_opt = optax.adam(lr)
+        self.Q2_opt = optax.adam(lr)
+        self.actor_opt = optax.adam(lr)
+
+        self.value_opt_state = self.value_opt.init(self.value_params)  # same optimizer for value and value_target
+        self.Q1_opt_state = self.Q1_opt.init(self.Q1_params)
+        self.Q2_opt_state = self.Q2_opt.init(self.Q2_params)
+        self.actor_opt_state = self.actor_opt.init(self.actor_params)
 
 
     # is this supposed to be batched_actor_step ?
@@ -161,10 +179,45 @@ class SACAgent(Agent):
         self.rng, key = jax.random.split(self.rng, 2)
         batch = self.memory.sample_batch(self.batch_size, key)
 
-        # compute value, q and actions
+        # compute actions and log_probs
+        actions, log_probs = self.select_actions(batch.state)
+
+        # get minimum Q value (see end of 4.2 in the paper)
+        state_action_input = jnp.concatenate(batch.state, batch.actions, axis=1)
+        q1 = jax.lax.stop_gradient(self.Q1.apply(self.Q1_params, state_action_input))
+        q2 = jax.lax.stop_gradient(self.Q2.apply(self.Q2_params, state_action_input))
+        q = jnp.minimum(q1, q2)
+
+        # get q_hat (see eq. 8 in paper)
+        q_hat = batch.reward + (1-batch.done)*self.gamma\
+                self.value_target.apply(self.value_target_params, batch.next_state)
+
+        # compute value, q and
         value = self.value.apply(self.value_params, batch.state)
         critic = self.critic.apply(self.critic_params, jnp.concatenate(batch.state, batch.actions, axis=1))
-        actions, log_probs = self.select_actions(batch.state)
+
+        # update agents
+
+        # TODO: implement self.value_loss_fn
+        value_grads = jax.grads(self.value_loss_fn)(self.value_params, batch.state)
+        value_updates, self.value_opt_state = self.value_opt.update(value_grads, self.value_opt_state)
+        self.value_params = optax.apply_updates(self.value_params, value_updates)
+
+        # TODO: implement self.Q_loss_fn
+        q1_grads = jax.grad(self.Q_loss_fn)(self.Q1_params, state_action_input)
+        q1_updates, self.Q1_opt_state = self.Q1_opt.update(Q1_grads, self.Q1_opt_state)
+        self.Q1_params = optax.apply_updates(self.Q1_params, Q1_updates)
+
+        q2_grads = jax.grad(self.Q_loss_fn)(self.Q2_params, state_action_input)
+        q2_updates, self.Q2_opt_state = self.Q2_opt.update(Q2_grads, self.Q2_opt_state)
+        self.Q2_params = optax.apply_updates(self.Q2_params, Q2_updates)
+
+        # TODO: implement self.actor_loss_fn
+        actor_grads = jax.grads(self.actor_loss_fn)(self.actor_params, batch.state)
+        actor_updates, self.actor_opt_state = self.actor_opt.update(actor_grads, self.actor_opt_state)
+        self.actor_params = optax.apply_updates(self.actor_params, actor_updates)
+
+
         return 0
 
 
