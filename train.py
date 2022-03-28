@@ -43,10 +43,10 @@ if __name__ == '__main__':
 
         print(traj_reward)
         if i % save_every == 0:
-            agent.save_checkpoint(chkpt_dir='dir_save/', id='{i}')
+            agent.save_checkpoint(chkpt_dir='dir_save/')
 
         if i % save_every == 0:
-            agent.save_checkpoint(chkpt_dir='dir_save/', id=f'{i}')
+            agent.save_checkpoint(chkpt_dir='dir_save/')
 
         if traj_reward > best_reward:
             best_reward = traj_reward
