@@ -1,6 +1,5 @@
 # Milestones
 liste de trucs à faire/coder, je pense on peut mettre l'avancement de ce que chacun est en train de faire, les problèmes qu'on rencontre etc...
-On peut mettre notre initiale à côté de ce qu'on est en train de coder (genre j'ai mis (N) à côté de replay buffer)
 
 ## utils
 - Replay buffer (N) fini!
@@ -14,16 +13,16 @@ On peut mettre notre initiale à côté de ce qu'on est en train de coder (genre
 Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_env (pas nécessaire), je fais tourner un random agent dessus, et j’affiche le debut de la simulation.
 
 ## agents
-* Fichier agents.py -> en cours (N)
+* Fichier agents.py -> en cours (N) (le fichier agents.py devient assez gros, on pourra peut-être le découper)
 * Fichier networks.py avec value, critic et actor -> fini (mais pas testé) (N) qui seront ensuite utilisés dans agents.py
 
 ## training
 
-* loss function
+* loss function 
 
-* backprop
+* backprop (N)
 
-* main loop (N) (à l'état de brouillon pour l'instant)
+* main loop (N) fini!
 
 ## testing/experiments
 * dossier ./tests pour rassembler nos tests 
