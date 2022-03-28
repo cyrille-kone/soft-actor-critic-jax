@@ -1,4 +1,4 @@
-env: pendulum
+env: ReacherEnv
 agent: random
 max_thread: -1
 

@@ -1,17 +1,18 @@
-import envs
+from envs import *
 import jax
+import sys
 from agents import SACAgent
 from dm_env import StepType
 import yaml
 
 if __name__ == '__main__':
-    env = envs.PusherEnv(0, for_evaluation=False)
     n_trajectories = 2000
     # checkpoint_file = 
     # plot file = 
     with open('./configs/example.yaml', 'r') as f:
         config_args = yaml.safe_load(f.read())
-    print(config_args['env'])
+    env = eval(config_args['env'])(for_evaluation=False)
+
     seed = 0
     rng = jax.random.PRNGKey(seed)
 
@@ -43,10 +44,10 @@ if __name__ == '__main__':
 
         print(traj_reward)
         if i % save_every == 0:
-            agent.save_checkpoint(chkpt_dir='dir_save/')
+            agent.save_checkpoint('dir_save')
 
         if i % save_every == 0:
-            agent.save_checkpoint(chkpt_dir='dir_save/')
+            agent.save_checkpoint('dir_save')
 
         if traj_reward > best_reward:
             best_reward = traj_reward
