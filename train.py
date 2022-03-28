@@ -1,11 +1,17 @@
 import envs
 from agents import SACAgent
+import yaml
 
 if __name__ == '__main__':
-    env = envs.PendulumEnv()
+    env = envs.PendulumEnv(True)
     n_trajectories = 200
     # checkpoint_file = 
     # plot file = 
+
+    with open('./configs/example.yaml', 'r') as f:
+        config_args = yaml.safe_load(f.read())
+    
+    print(config_args['env'])
 
     agent = SACAgent()
 
@@ -29,12 +35,12 @@ if __name__ == '__main__':
                 agent.learner_step()
 
             if i % save_every == 0:
-                agent.save_checkpoint(chkpt_dir='dir_save/', id=f'{i}')
+                agent.save_checkpoint(chkpt_dir='dir_save/', id='{i}')
 
             timestep = timestep_
 
         if traj_reward > best_reward:
             best_reward = traj_reward
-            print(f"Trajectory\t{i}/{n_trajectories}")
-            print(f"Reward \t {traj_reward}, Best \t {best_reward}")
+            print("Trajectory\t{i}/{n_trajectories}")
+            print("Reward \t {traj_reward}, Best \t {best_reward}")
 

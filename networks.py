@@ -81,6 +81,7 @@ class CriticNetwork(CustomMLP):
 
         self._expected_input_dims = obs_dims+action_dims  # to assert correct input dims
 
+
 class ValueNetwork(CustomMLP):
     def __init__(self, obs_dims: int,
                  hidden_output_dims=(256, 256),
