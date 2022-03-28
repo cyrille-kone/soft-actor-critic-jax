@@ -5,7 +5,7 @@ from dm_env import StepType
 import yaml
 
 if __name__ == '__main__':
-    env = envs.PendulumEnv(for_evaluation=False)
+    env = envs.PusherEnv(0, for_evaluation=False)
     n_trajectories = 2000
     # checkpoint_file = 
     # plot file = 
@@ -42,8 +42,8 @@ if __name__ == '__main__':
                 actor_loss = agent.learner_step()
 
         print(traj_reward)
-            if i % save_every == 0:
-                agent.save_checkpoint(chkpt_dir='dir_save/', id='{i}')
+        if i % save_every == 0:
+            agent.save_checkpoint(chkpt_dir='dir_save/', id='{i}')
 
         if i % save_every == 0:
             agent.save_checkpoint(chkpt_dir='dir_save/', id=f'{i}')
