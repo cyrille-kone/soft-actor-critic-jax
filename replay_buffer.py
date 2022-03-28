@@ -24,9 +24,9 @@ class ReplayBuffer():
                                        next_state=next_state,
                                        done=done))
 
-    def sample_batch(self, batch_size: int, rng: jnp.ndarray) -> Transition:
+    def sample_batch(self, batch_size: int, rng) -> Transition:
         """Returns a Transition of batches"""
-        indices = jax.random.randint(rng, (batch_size,), 0, len(self._memory))
+        indices = jax.random.randint(rng, (batch_size,), 0, len(self._memory)-1)
 
         states = []
         actions = []
@@ -35,7 +35,11 @@ class ReplayBuffer():
         dones = []
 
         for i in indices:
-            t = self._memory[i]
+            try:
+                t = self._memory[i]
+            except:
+                print(i)
+                exit()
             states.append(t.state)
             actions.append(t.action)
             next_states.append(t.next_state)
@@ -45,7 +49,7 @@ class ReplayBuffer():
         return Transition(
             jnp.array(states),
             jnp.array(actions),
-            jnp.array(next_states),
             jnp.array(rewards),
+            jnp.array(next_states),
             jnp.array(dones)
         )
