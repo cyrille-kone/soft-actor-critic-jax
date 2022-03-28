@@ -19,11 +19,11 @@ Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_e
 
 ## training
 
-* loss function
+* loss function 
 
-* backprop
+* backprop (N)
 
-* main loop (N) (à l'état de brouillon pour l'instant)
+* main loop (N) fini!
 
 ## testing/experiments
 * dossier ./tests pour rassembler nos tests 
