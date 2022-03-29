@@ -165,11 +165,11 @@ class SACAgent(Agent):
         """soft update of network parameters"""
         pass
 
-    def save_checkpoint(chkpt_dir):
+    def save_checkpoint(self, chkpt_dir):
         """uses networks save_checkpoint methods"""
         pass
 
-    def load_checkpoint(chkpt_dir):
+    def load_checkpoint(self, chkpt_dir):
         pass
 
     def value_loss(self, params, value, target):
