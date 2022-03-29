@@ -154,7 +154,7 @@ class SACAgent(Agent):
 
         This is meant to be used while interacting with the environment
         """
-        action, _ = self.select_actions(jnp.expand_dims(obs, 0))
+        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0))
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
