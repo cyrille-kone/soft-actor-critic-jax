@@ -34,7 +34,7 @@ if __name__ == '__main__':
         traj_reward = 0
         n_steps = 0
         while timestep.step_type != StepType.LAST and n_steps <= max_steps:
-            action = agent.select_action(timestep.observation)
+            action = agent.select_action(agent.actor_params, timestep.observation)
             timestep_ = env.step(action)  # underscore denotes timestep t+1
             agent.record(timestep, action, timestep_)
             traj_reward += timestep_.reward
