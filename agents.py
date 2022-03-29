@@ -112,7 +112,7 @@ class SACAgent(Agent):
         self.update_q = jax.jit(self._update_q)
 
     # is this supposed to be batched_actor_step ?
-    def select_actions(self, actor_params, observations: chex.Array) -> chex.Array:
+    def select_actions(self, actor_params, observations: chex.Array, key) -> chex.Array:
         """
         observations: chex.Array
                 batch of states
@@ -122,9 +122,7 @@ class SACAgent(Agent):
         also computes log_probs, to compute loss function
         return: actions, log_probs
         """
-        self.rng, key = jax.random.split(self.rng, 2)
         mus, log_sigmas = self.actor.apply(actor_params, observations)
-
         # see appendix C in SAC paper
 
         # sample actions according to normal distributions
@@ -144,7 +142,7 @@ class SACAgent(Agent):
         # squash actions to enforce action bounds
         actions = jnp.tanh(actions) * self.action_spec().maximum
 
-        return actions, log_probs
+        return actions, log_probs, rng
 
     def select_action(self, obs: chex.Array) -> chex.Array:
         """
@@ -154,7 +152,7 @@ class SACAgent(Agent):
 
         This is meant to be used while interacting with the environment
         """
-        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0))
+        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), next(self.rng))
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
@@ -198,10 +196,10 @@ class SACAgent(Agent):
         value_params = optax.apply_updates(value_params, value_updates)
         return value_params, value_opt_state
 
-    def _update_actor(self, actor_params, actor_opt_state, q, observations):
+    def _update_actor(self, actor_params, actor_opt_state, key, q, observations):
 
         def actor_loss_fn(actor_params, q, observations):
-            _, log_probs = self.select_actions(actor_params, observations)
+            _, log_probs = self.select_actions(actor_params, observations, key)
             return (log_probs - q).mean()
         
         actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)( 
@@ -255,9 +253,10 @@ class SACAgent(Agent):
         # !! I didn't understand what the "reparameterization trick" was so I didn't code it yet
 
         # compute actor gradients and update actor network
+        self.rng, key = jax.random.split(self.rng, 2)
         actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
             self.actor_params, self.actor_opt_state,
-            q, batch.state
+            key, q, batch.state
         )
 
         # get q_hat (see eq. 8 in paper)
