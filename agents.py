@@ -50,7 +50,7 @@ class SACAgent(Agent):
                  actor_lr=3e-4,
                  value_lr=3e-4,
                  q_lr=3e-4,
-                 hidden_output_dims = (256, 256),
+                 hidden_dims = (256, 256),
                  discount=0.99,
                  tau=0.005, # target smoothing coefficient,
                  target_period_update=1,
@@ -63,23 +63,23 @@ class SACAgent(Agent):
         print("initializing networks")
         self.value = hk.without_apply_rng(hk.transform(lambda x:
                             ValueNetwork(obs_dims,
-                                         hidden_output_dims=hidden_output_dims,
+                                         hidden_output_dims=hidden_dims,
                                          chkpt_dir=chkpt_dir)(x)))
         self.value_target = hk.without_apply_rng(hk.transform(lambda x:
                             ValueNetwork(obs_dims,
-                                         hidden_output_dims=hidden_output_dims,
+                                         hidden_output_dims=hidden_dims,
                                          chkpt_dir=chkpt_dir)(x)))
 
         # we use two distinct Q networks (see end of 4.2 in the paper)
         self.Q = hk.without_apply_rng(hk.transform(lambda x:
                             CriticNetwork(obs_dims,
                                           action_dims,
-                                          hidden_output_dims=hidden_output_dims,
+                                          hidden_output_dims=hidden_dims,
                                           chkpt_dir=chkpt_dir)(x)))
         self.actor = hk.without_apply_rng(hk.transform(lambda x:
                             ActorNetwork(obs_dims,
                                          action_dims,
-                                         hidden_output_dims=hidden_output_dims,
+                                         hidden_output_dims=hidden_dims,
                                          chkpt_dir=chkpt_dir)(x)))
 
         self.rng = rng
