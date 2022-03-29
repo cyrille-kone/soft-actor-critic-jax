@@ -257,7 +257,7 @@ class SACAgent(Agent):
         # compute actor gradients and update actor network
         actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
             self.actor_params, self.actor_opt_state,
-            key, q, batch.state
+            q, batch.state
         )
 
         # get q_hat (see eq. 8 in paper)
