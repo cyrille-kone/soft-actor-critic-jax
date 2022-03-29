@@ -142,7 +142,7 @@ class SACAgent(Agent):
         # squash actions to enforce action bounds
         actions = jnp.tanh(actions) * self.action_spec().maximum
 
-        return actions, log_probs, rng
+        return actions, log_probs
 
     def select_action(self, obs: chex.Array) -> chex.Array:
         """
