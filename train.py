@@ -18,16 +18,15 @@ def evaluate(environment, agent, evaluation_episodes):
     episode_return = 0
     steps = 0
     while not timestep.last():
-      frames.append(timestep.observation['rgb'])
 
-      action = agent.select_action(timestep.observation)
+      action = agent.select_action(agent.actor_params, timestep.observation)
       timestep = environment.step(action)
       steps += 1
       episode_return += timestep.reward
     print(
         f'Episode {episode} ended with reward {episode_return} in {steps} steps'
     )
-  return frames
+  return 0
 
 def display_video(frames, filename='temp.mp4', frame_repeat=4):
   """Save and display video."""
@@ -83,8 +82,8 @@ if __name__ == '__main__':
 
             if n_steps % train_every == 0:
                 actor_loss = agent.learner_step()
-            if n_steps % eval_every == 0:
-                display_video(evaluate(env, agent, evaluation_episodes=1))
+    if i % eval_every == 0:
+        evaluate(env, agent, evaluation_episodes=1)
 
         print(traj_reward)
         if i % save_every == 0:
