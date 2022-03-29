@@ -6,17 +6,16 @@ from dm_env import StepType
 import yaml
 
 if __name__ == '__main__':
-    n_trajectories = 2000
     # checkpoint_file = 
     # plot file = 
     with open('./configs/example.yaml', 'r') as f:
         config_args = yaml.safe_load(f.read())
     env = eval(config_args['env'])(for_evaluation=False)
-
-    seed = 0
+    n_trajectories = config_args['n_trajectories']
+    seed = config_args['seed']
     rng = jax.random.PRNGKey(seed)
 
-    agent = SACAgent(rng, env.observation_spec, env.action_spec)
+    agent = SACAgent(rng, env.observation_spec, env.action_spec, **config_args['agent_kwargs'])
 
 
     best_reward = 0   # env.reward_spec().minimum() ?  # should be min reward possible

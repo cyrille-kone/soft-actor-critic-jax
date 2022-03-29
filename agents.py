@@ -47,11 +47,13 @@ class SACAgent(Agent):
                  obs_spec,
                  action_spec,
                  batch_size=256,
-                 lr=3e-4,  # same for all networks
+                 actor_lr=3e-4,
+                 value_lr=3e-4,
+                 q_lr=3e-4,
                  hidden_output_dims = (256, 256),
-                 gamma=0.99,
+                 discount=0.99,
                  tau=0.005, # target smoothing coefficient,
-                 target_update=1000,
+                 target_period_update=1,
                  chkpt_dir=None):
 
         obs_dims = obs_spec().shape[0]
@@ -85,7 +87,7 @@ class SACAgent(Agent):
         self.obs_spec = obs_spec
         self.action_spec = action_spec
         self.batch_size = batch_size
-        self.gamma = gamma
+        self.discount = discount
         self.tau = tau
 
         # initialize networks parameters
@@ -99,10 +101,10 @@ class SACAgent(Agent):
         self.actor_params = self.actor.init(actor_key, dummy_obs)
 
         # create and initialize optimizers
-        self.value_opt = optax.adam(lr)
-        self.Q1_opt = optax.adam(lr)
-        self.Q2_opt = optax.adam(lr)
-        self.actor_opt = optax.adam(lr)
+        self.value_opt = optax.adam(value_lr)
+        self.Q1_opt = optax.adam(q_lr)
+        self.Q2_opt = optax.adam(q_lr)
+        self.actor_opt = optax.adam(actor_lr)
 
         self.value_opt_state = self.value_opt.init(self.value_params)  # same optimizer for value and value_target
         self.Q1_opt_state = self.Q1_opt.init(self.Q1_params)
@@ -225,7 +227,7 @@ class SACAgent(Agent):
         return actor_loss, actor_params, actor_opt_state
 
     def _update_critic(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
-        q_hat = batch.reward + (1-batch.done)*self.gamma*\
+        q_hat = batch.reward + (1-batch.done)*self.discount*\
                 self.value_target.apply(self.value_target_params, batch.next_state)
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
@@ -274,7 +276,7 @@ class SACAgent(Agent):
         )
 
         # get q_hat (see eq. 8 in paper)
-        # q_hat = batch.reward + (1-batch.done)*self.gamma*\
+        # q_hat = batch.reward + (1-batch.done)*self.discount*\
         #         self.value_target.apply(self.value_target_params, batch.next_state)
 
         # compute q (use actions from replay buffer this time (paper eq. 7))
