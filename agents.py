@@ -152,7 +152,8 @@ class SACAgent(Agent):
 
         This is meant to be used while interacting with the environment
         """
-        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), next(self.rng))
+        self.rng, key = jax.random.split(self.rng, 2)
+        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), key)
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
