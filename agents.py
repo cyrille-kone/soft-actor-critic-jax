@@ -258,22 +258,6 @@ class SACAgent(Agent):
         )
         # !! I didn't understand what the "reparameterization trick" was so I didn't code it yet
 
-        # compute actor gradients and update actor network
-        self.rng, key = jax.random.split(self.rng, 2)
-        actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
-            self.actor_params, self.actor_opt_state,
-            key, q, batch.state
-        )
-
-        # get q_hat (see eq. 8 in paper)
-        # q_hat = batch.reward + (1-batch.done)*self.discount*\
-        #         self.value_target.apply(self.value_target_params, batch.next_state)
-
-        # compute q (use actions from replay buffer this time (paper eq. 7))
-        # state_action_input = jnp.concatenate((batch.state, batch.action), axis=1)
-        # q1_r = self.Q1.apply(self.Q1_params, state_action_input)  # _r is for replay buffer
-        # q2_r = self.Q2.apply(self.Q2_params, state_action_input)
-
         # compute q gradients and update critic networks
         self.Q1_params, self.Q1_opt_state, self.Q2_params, self.Q2_opt_state = self.update_q(
             self.Q1_params, self.Q1_opt_state,
@@ -281,8 +265,13 @@ class SACAgent(Agent):
             batch
         )
 
-        # soft-update target value network parameters 
-        # jax.tree_multimap applies update recursively to weight and biases of the layers of the networks
+        # compute actor gradients and update actor network
+        self.rng, key = jax.random.split(self.rng, 2)
+        actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
+            self.actor_params, self.actor_opt_state,
+            key, q, batch.state
+        )
+
         self.value_target_params = jax.tree_multimap(
             lambda params, target_params: self.tau*params + (1-self.tau)*target_params,
             self.value_params, self.value_target_params)
