@@ -19,7 +19,7 @@ def evaluate(environment, agent, evaluation_episodes):
     steps = 0
     while not timestep.last():
 
-      action = agent.select_action(agent.actor_params, timestep.observation)
+      action = agent.select_action(timestep.observation)
       timestep = environment.step(action)
       steps += 1
       episode_return += timestep.reward

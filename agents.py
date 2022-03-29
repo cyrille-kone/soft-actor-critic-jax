@@ -188,7 +188,17 @@ class SACAgent(Agent):
     def load_checkpoint(self, chkpt_dir):
         pass
 
-    def _update_value(self, value_params, value_opt_state, state, q, log_probs):
+    def _update_value(self, value_params, value_opt_state, key, state):
+        # compute actions and log_probs from current policy
+        actions, log_probs = self.select_actions(self.actor_params, state, key)
+
+        # get minimum Q value (see end of 4.2 in the paper)
+        # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
+        state_action_input = jnp.concatenate((state, actions), axis=1)
+        
+        q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
+        q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
+        q = jnp.minimum(q1, q2)
 
         def value_loss_fn(value_params, state, target):
             value = self.value.apply(value_params, state)
@@ -199,14 +209,19 @@ class SACAgent(Agent):
         value_params = optax.apply_updates(value_params, value_updates)
         return value_params, value_opt_state
 
-    def _update_actor(self, actor_params, actor_opt_state, key, q, observations):
+    def _update_actor(self, actor_params, actor_opt_state, key, state):
 
-        def actor_loss_fn(actor_params, q, observations):
-            _, log_probs = self.select_actions(actor_params, observations, key)
+        def actor_loss_fn(actor_params, observations):
+            actions, log_probs = self.select_actions(actor_params, observations, key)
+            state_action_input = jnp.concatenate((state, actions), axis=1)
+        
+            q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
+            q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
+            q = jnp.minimum(q1, q2)
             return (log_probs - q).mean()
         
         actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)( 
-            actor_params, q, observations
+            actor_params, state
         )
 
         actor_updates, actor_opt_state = self.actor_opt.update(actor_grads, actor_opt_state)
@@ -237,24 +252,11 @@ class SACAgent(Agent):
         self.rng, key = jax.random.split(self.rng, 2)
         batch = self.memory.sample_batch(self.batch_size, key)
 
-        # compute actions and log_probs from current policy
         self.rng, key = jax.random.split(self.rng, 2)
-        actions, log_probs = self.select_actions(self.actor_params, batch.state, key)
-
-        # get minimum Q value (see end of 4.2 in the paper)
-        # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
-        state_action_input = jnp.concatenate((batch.state, actions), axis=1)
-        q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
-        q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
-        q = jnp.minimum(q1, q2)
-
-        # compute value
-        # value = self.value.apply(self.value_params, batch.state)
-
         # compute value gradients and update value network
         self.value_params, self.value_opt_state = self.update_value(
             self.value_params, self.value_opt_state,
-            batch.state, q, log_probs
+            key, batch.state
         )
         # !! I didn't understand what the "reparameterization trick" was so I didn't code it yet
 
@@ -269,7 +271,7 @@ class SACAgent(Agent):
         self.rng, key = jax.random.split(self.rng, 2)
         actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
             self.actor_params, self.actor_opt_state,
-            key, q, batch.state
+            key, batch.state
         )
 
         self.value_target_params = jax.tree_multimap(
