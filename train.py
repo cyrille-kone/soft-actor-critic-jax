@@ -12,7 +12,7 @@ import IPython
 
 def evaluate(environment, agent, evaluation_episodes):
   frames = []
-
+  avg_rew = 0.
   for episode in range(evaluation_episodes):
     timestep = environment.reset()
     episode_return = 0
@@ -23,9 +23,11 @@ def evaluate(environment, agent, evaluation_episodes):
       timestep = environment.step(action)
       steps += 1
       episode_return += timestep.reward
-    print(
-        f'Episode {episode} ended with reward {episode_return} in {steps} steps'
-    )
+    avg_rew += episode_return
+  avg_rew /= evaluation_episodes
+  print(
+      f'Evaluation ended with reward {avg_rew} in {evaluation_episodes} episodes'
+  )
   return 0
 
 def display_video(frames, filename='temp.mp4', frame_repeat=4):
@@ -68,7 +70,7 @@ if __name__ == '__main__':
     eval_every = config_args['eval_interval']
 
     for i in range(1, n_trajectories+1):
-        print(f'trajectory {i}')
+        # print(f'trajectory {i}')
         timestep = env.reset()
         traj_reward = 0
         n_steps = 0
@@ -83,11 +85,9 @@ if __name__ == '__main__':
             if n_steps % train_every == 0 and len(agent.memory) >= agent.batch_size:
                 actor_loss = agent.learner_step()
         if i % eval_every == 0:
-            evaluate(env, agent, evaluation_episodes=1)
+            evaluate(env, agent, evaluation_episodes=5)
 
-        print(traj_reward)
-        if i % save_every == 0:
-            agent.save_checkpoint('dir_save')
+        # print(traj_reward)
 
         if i % save_every == 0:
             agent.save_checkpoint('dir_save')
