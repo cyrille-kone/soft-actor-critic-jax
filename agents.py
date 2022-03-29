@@ -112,7 +112,7 @@ class SACAgent(Agent):
         self.update_q = jax.jit(self._update_q)
 
     # is this supposed to be batched_actor_step ?
-    def select_actions(self, observations: chex.Array) -> chex.Array:
+    def select_actions(self, actor_params, observations: chex.Array) -> chex.Array:
         """
         observations: chex.Array
                 batch of states
@@ -123,7 +123,7 @@ class SACAgent(Agent):
         return: actions, log_probs
         """
         self.rng, key = jax.random.split(self.rng, 2)
-        mus, log_sigmas = self.actor.apply(self.actor_params, observations)
+        mus, log_sigmas = self.actor.apply(actor_params, observations)
 
         # see appendix C in SAC paper
 
@@ -143,7 +143,6 @@ class SACAgent(Agent):
 
         # squash actions to enforce action bounds
         actions = jnp.tanh(actions) * self.action_spec().maximum
-
 
         return actions, log_probs
 
@@ -199,27 +198,14 @@ class SACAgent(Agent):
         value_params = optax.apply_updates(value_params, value_updates)
         return value_params, value_opt_state
 
-    def _update_actor(self, actor_params, actor_opt_state, key, q, observations):
+    def _update_actor(self, actor_params, actor_opt_state, q, observations):
 
-        def actor_loss_fn(actor_params, key, q, observations):
-            mus, log_sigmas = self.actor.apply(actor_params, observations)
-            # sample actions according to normal distributions via reparameterization trick
-            actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
-
-            # compute log_likelihood of the sampled actions
-            log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/2/jnp.exp(log_sigmas))**2
-
-            # squash actions to enforce action bounds
-            actions = jnp.tanh(actions) * self.action_spec().maximum
-
-            # compute squashed log-likelihood
-            # ! other implementations put a relu in the log
-            # + 1e-6 to prevent log(0)
-            log_probs -= jnp.sum(jnp.log(1 - jnp.tanh(actions)**2 + 1e-6), axis=1, keepdims=True)
+        def actor_loss_fn(actor_params, q, observations):
+            _, log_probs = self.select_actions(actor_params, observations)
             return (log_probs - q).mean()
         
         actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)( 
-            actor_params, key, q, observations
+            actor_params, q, observations
         )
         actor_updates, actor_opt_state = self.actor_opt.update(actor_grads, actor_opt_state)
         actor_params = optax.apply_updates(actor_params, actor_updates)
@@ -249,7 +235,7 @@ class SACAgent(Agent):
         batch = self.memory.sample_batch(self.batch_size, key)
 
         # compute actions and log_probs from current policy
-        actions, log_probs = self.select_actions(batch.state)
+        actions, log_probs = self.select_actions(self.actor_params, batch.state)
 
         # get minimum Q value (see end of 4.2 in the paper)
         # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
