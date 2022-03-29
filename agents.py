@@ -132,18 +132,18 @@ class SACAgent(Agent):
         # see appendix C in SAC paper
 
         # sample actions according to normal distributions
-        actions = jax.random.multivariate_normal(key, mus, jnp.array([jnp.diag(jnp.exp(s)) for s in log_sigmas]))
+        actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
 
         # compute log_likelihood of the sampled actions
         log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/(2*jnp.exp(log_sigmas)))**2
-
-        # squash actions to enforce action bounds
-        actions = jnp.tanh(actions) * (self.action_spec().maximum - self.action_spec().minimum)
 
         # compute squashed log-likelihood
         # ! other implementations put a relu in the log
         # + 1e-6 to prevent log(0)
         log_probs -= jnp.sum(jnp.log(1 - jnp.tanh(actions)**2 + 1e-6), axis=1, keepdims=True)
+
+        # squash actions to enforce action bounds
+        actions = jnp.tanh(actions) * self.action_spec().maximum
 
 
         return actions, log_probs
