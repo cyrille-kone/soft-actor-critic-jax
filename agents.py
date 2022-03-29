@@ -114,10 +114,13 @@ class SACAgent(Agent):
         self.update_q = jax.jit(self._update_q)
 
     # is this supposed to be batched_actor_step ?
-    def select_actions(self, actor_params, observations: chex.Array, key) -> chex.Array:
+    def select_actions(self, actor_params, observations: chex.Array, key, deterministic=False) -> chex.Array:
         """
         observations: chex.Array
                 batch of states
+        deterministic: bool
+                use deterministic policy improve performance during the
+                evaluation. Read 5.2 of the SAC paper.
 
         for each observations, generates action distribution from actor
         and samples from this distribution
@@ -126,6 +129,9 @@ class SACAgent(Agent):
         """
         mus, log_sigmas = self.actor.apply(actor_params, observations)
         # see appendix C in SAC paper
+
+        if deterministic:
+            return jnp.tanh(mus) * self.action_spec().maximum, None
 
         # sample actions according to normal distributions
         actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
@@ -146,16 +152,19 @@ class SACAgent(Agent):
 
         return actions, log_probs
 
-    def select_action(self, obs: chex.Array) -> chex.Array:
+    def select_action(self, obs: chex.Array, deterministic=False) -> chex.Array:
         """
         obs: chex.Array
                 a single observation
+        deterministic: bool
+                use deterministic policy improve performance during the
+                evaluation. Read 5.2 of the SAC paper.
         returns a single action sampled from actor's  distribution
 
         This is meant to be used while interacting with the environment
         """
         self.rng, key = jax.random.split(self.rng, 2)
-        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), key)
+        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), key, deterministic)
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
