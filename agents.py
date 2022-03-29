@@ -95,7 +95,8 @@ class SACAgent(Agent):
 
         dummy_obs = jnp.ones(obs_spec().shape)
         dummy_action = jnp.ones(action_spec().shape)
-        self.value_params = self.value_target_params = self.value.init(value_key, dummy_obs)
+        self.value_params = self.value.init(value_key, dummy_obs)
+        self.value_target_params = self.value.init(value_key, dummy_obs)
         self.Q1_params = self.Q.init(Q1_key, jnp.concatenate((dummy_obs, dummy_action)))
         self.Q2_params = self.Q.init(Q2_key, jnp.concatenate((dummy_obs, dummy_action)))
         self.actor_params = self.actor.init(actor_key, dummy_obs)
