@@ -128,6 +128,11 @@ class SACAgent(Agent):
         """
         self.rng, key = jax.random.split(self.rng, 2)
         mus, log_sigmas = self.actor.apply(self.actor_params, observations)
+        log_sigmas = jnp.clip(
+            jax.nn.softplus(log_sigmas),
+            -20,
+            2
+        )
 
         # see appendix C in SAC paper
 
@@ -227,8 +232,7 @@ class SACAgent(Agent):
         return actor_loss, actor_params, actor_opt_state
 
     def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
-        # Reward scaling. See 5.2 in SAC paper.
-        q_hat = batch.reward * 5 + (1-batch.done)*self.discount*\
+        q_hat = batch.reward + (1-batch.done)*self.discount*\
                 self.value_target.apply(self.value_target_params, batch.next_state)
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
