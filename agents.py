@@ -67,7 +67,7 @@ class SACAgent(Agent):
                                          chkpt_dir=chkpt_dir)(x)))
 
         # we use two distinct Q networks (see end of 4.2 in the paper)
-        self.Q1 = hk.without_apply_rng(hk.transform(lambda x:
+        self.Q = hk.without_apply_rng(hk.transform(lambda x:
                             CriticNetwork(obs_dims,
                                           action_dims,
                                           hidden_output_dims=hidden_dims,
