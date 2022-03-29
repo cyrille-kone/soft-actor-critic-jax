@@ -80,7 +80,7 @@ if __name__ == '__main__':
             timestep = timestep_
             n_steps += 1
 
-            if n_steps % train_every == 0:
+            if n_steps % train_every == 0 and len(agent.memory) >= agent.batch_size:
                 actor_loss = agent.learner_step()
         if i % eval_every == 0:
             evaluate(env, agent, evaluation_episodes=1)

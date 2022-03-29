@@ -14,6 +14,9 @@ class ReplayBuffer():
         self.max_length = max_length
 
         self._memory = []
+    
+    def __len__(self):
+        return len(self._memory)
 
     def store_transition(self, state, action, reward, next_state, done) -> None:
         while len(self._memory) >= self.max_length:
