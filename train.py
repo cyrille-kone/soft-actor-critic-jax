@@ -10,6 +10,7 @@ import yaml
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='./configs/example.yaml', type=str)
+    parser.add_argument('--r_scale', default=1., type=float)
     args = parser.parse_args()
     with open(Path(args.config), 'r') as f:
         config_args = yaml.safe_load(f.read())
@@ -18,6 +19,7 @@ if __name__ == '__main__':
     seed = config_args['seed']
     rng = jax.random.PRNGKey(seed)
 
+    config_args['agent_kwargs']['reward_scale'] = args.r_scale
     agent = SACAgent(rng, env.observation_spec, env.action_spec, **config_args['agent_kwargs'])
 
 

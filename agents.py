@@ -54,6 +54,7 @@ class SACAgent(Agent):
                  discount=0.99,
                  tau=0.005, # target smoothing coefficient,
                  target_period_update=1,
+                 reward_scale=1.,
                  chkpt_dir=None):
 
         obs_dims = obs_spec().shape[0]
@@ -85,6 +86,7 @@ class SACAgent(Agent):
         self.batch_size = batch_size
         self.discount = discount
         self.tau = tau
+        self.reward_scale = reward_scale
 
         # initialize networks parameters
         self.rng, value_key, Q1_key, Q2_key, actor_key = jax.random.split(self.rng, 5)
@@ -211,7 +213,7 @@ class SACAgent(Agent):
         return actor_loss, actor_params, actor_opt_state
 
     def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
-        q_hat = batch.reward * 20 + (1-batch.done)*self.discount*\
+        q_hat = batch.reward * self.reward_scale + (1-batch.done)*self.discount*\
                 self.value.apply(self.value_target_params, batch.next_state)
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
