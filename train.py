@@ -20,10 +20,10 @@ if __name__ == '__main__':
 
     best_reward = 0   # env.reward_spec().minimum() ?  # should be min reward possible
     all_rewards = []  # for future plotting
-    max_steps = 500   # maximum number of steps in a trajectory to prevent infinite loops
+    max_steps = config_args['max_steps_per_episode']   # maximum number of steps in a trajectory to prevent infinite loops
 
-    train_every = 10
-    save_every = 100
+    train_every = config_args['train_interval']
+    save_every = config_args['save_interval']
 
     for i in range(1, n_trajectories+1):
         print(f'trajectory {i}')
