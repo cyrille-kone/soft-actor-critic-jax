@@ -209,6 +209,11 @@ class SACAgent(Agent):
 
         def actor_loss_fn(actor_params, key, q, observations):
             mus, log_sigmas = self.actor.apply(actor_params, observations)
+            log_sigmas = jnp.clip(
+                jax.nn.softplus(log_sigmas),
+                -20,
+                2
+            )
             # sample actions according to normal distributions via reparameterization trick
             actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
 
