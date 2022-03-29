@@ -9,6 +9,7 @@
 - Ecrire rapport 
 liste de trucs à faire/coder, je pense on peut mettre l'avancement de ce que chacun est en train de faire, les problèmes qu'on rencontre etc...
 
+
 ## utils
 - Replay buffer (N) fini!
 - loggging & config file OK [cyrk] 
@@ -21,16 +22,17 @@ liste de trucs à faire/coder, je pense on peut mettre l'avancement de ce que ch
 Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_env (pas nécessaire), je fais tourner un random agent dessus, et j’affiche le debut de la simulation.
 
 ## agents
-* Fichier agents.py -> en cours (N) (le fichier agents.py devient assez gros, on pourra peut-être le découper)
+* Fichier agents.py -> jitted et modifié, donc accéléré. Dans la version précédente, il semble que les gradients soient nuls.
 * Fichier networks.py avec value, critic et actor -> fini (mais pas testé) (N) qui seront ensuite utilisés dans agents.py
 
 ## training
 
-* loss function 
+* Fichier train.py -> now use yaml config files for all parameters (saved in ./configs/)
 
-* backprop (N)
-
-* main loop (N) fini!
+Run code by
+```
+python train.py --config ./configs/inverted_pendulum.yaml
+```
 
 ## testing/experiments
 
