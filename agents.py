@@ -234,7 +234,8 @@ class SACAgent(Agent):
         batch = self.memory.sample_batch(self.batch_size, key)
 
         # compute actions and log_probs from current policy
-        actions, log_probs = self.select_actions(self.actor_params, batch.state)
+        self.rng, key = jax.random.split(self.rng, 2)
+        actions, log_probs = self.select_actions(self.actor_params, batch.state, key)
 
         # get minimum Q value (see end of 4.2 in the paper)
         # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
