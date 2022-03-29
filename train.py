@@ -1,3 +1,5 @@
+import argparse
+from pathlib import Path
 from envs import *
 import jax
 import sys
@@ -6,9 +8,10 @@ from dm_env import StepType
 import yaml
 
 if __name__ == '__main__':
-    # checkpoint_file = 
-    # plot file = 
-    with open('./configs/example.yaml', 'r') as f:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='./configs/example.yaml', type=str)
+    args = parser.parse_args()
+    with open(Path(args.config), 'r') as f:
         config_args = yaml.safe_load(f.read())
     env = eval(config_args['env'])(for_evaluation=False)
     n_trajectories = config_args['n_trajectories']
