@@ -82,8 +82,8 @@ if __name__ == '__main__':
 
             if n_steps % train_every == 0:
                 actor_loss = agent.learner_step()
-    if i % eval_every == 0:
-        evaluate(env, agent, evaluation_episodes=1)
+        if i % eval_every == 0:
+            evaluate(env, agent, evaluation_episodes=1)
 
         print(traj_reward)
         if i % save_every == 0:
