@@ -137,15 +137,13 @@ class SACAgent(Agent):
         actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
 
         # compute log_likelihood of the sampled actions
-        log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/(2*jnp.exp(log_sigmas)))**2
+        log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - 0.5*((actions-mus)/jnp.exp(log_sigmas))**2
 
         # compute squashed log-likelihood
         # ! other implementations put a relu in the log
         # + 1e-6 to prevent log(0)
-        log_probs -= jnp.sum(
-            jnp.log(jax.nn.relu(1 - jnp.tanh(actions)**2) + 1e-6),
-            axis=1, keepdims=True
-        )
+        log_probs -= jnp.log(1 - jnp.tanh(actions)**2 + 1e-6),
+        log_probs = jnp.sum(log_probs, axis=1, keepdims=True)
 
         # squash actions to enforce action bounds
         actions = jnp.tanh(actions) * self.action_spec().maximum
