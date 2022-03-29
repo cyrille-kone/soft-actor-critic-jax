@@ -1,4 +1,4 @@
-env: ReacherEnv
+env: InvertedPendulumEnv
 agent: random
 max_thread: -1
 

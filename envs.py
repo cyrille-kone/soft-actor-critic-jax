@@ -64,7 +64,7 @@ class MixinEnv(dm_env.Environment):
 class PendulumEnv(MixinEnv):
     def __init__(self, for_evaluation: bool) -> None:
         super().__init__(for_evaluation)
-        self._env = gym.make('Pendulum-v1')
+        self._env = gym.make('Pendulum-v0')
         self._for_evaluation = for_evaluation
         if self._for_evaluation:
             self.screens = []
