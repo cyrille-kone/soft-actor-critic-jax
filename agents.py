@@ -113,7 +113,7 @@ class SACAgent(Agent):
 
         self.update_value = jax.jit(self._update_value)
         self.update_actor = jax.jit(self._update_actor)
-        self.update_critic = jax.jit(self._update_critic)
+        self.update_q = jax.jit(self._update_q)
 
     # is this supposed to be batched_actor_step ?
     def select_actions(self, observations: chex.Array) -> chex.Array:
@@ -204,8 +204,8 @@ class SACAgent(Agent):
 
         def actor_loss_fn(actor_params, key, q, observations):
             mus, log_sigmas = self.actor.apply(actor_params, observations)
-            # sample actions according to normal distributions
-            actions = jax.random.multivariate_normal(key, mus, jnp.array([jnp.diag(jnp.exp(s)) for s in log_sigmas]))
+            # sample actions according to normal distributions via reparameterization trick
+            actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
 
             # compute log_likelihood of the sampled actions
             log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/2/jnp.exp(log_sigmas))**2
@@ -226,7 +226,7 @@ class SACAgent(Agent):
         actor_params = optax.apply_updates(actor_params, actor_updates)
         return actor_loss, actor_params, actor_opt_state
 
-    def _update_critic(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
+    def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
         q_hat = batch.reward + (1-batch.done)*self.discount*\
                 self.value_target.apply(self.value_target_params, batch.next_state)
         def q_loss(q_params, q_hat, state, action):
@@ -285,7 +285,7 @@ class SACAgent(Agent):
         # q2_r = self.Q2.apply(self.Q2_params, state_action_input)
 
         # compute q gradients and update critic networks
-        self.Q1_params, self.Q1_opt_state, self.Q2_params, self.Q2_opt_state = self.update_critic(
+        self.Q1_params, self.Q1_opt_state, self.Q2_params, self.Q2_opt_state = self.update_q(
             self.Q1_params, self.Q1_opt_state,
             self.Q2_params, self.Q2_opt_state,
             batch
