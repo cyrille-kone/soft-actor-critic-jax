@@ -1,4 +1,5 @@
 import argparse
+import base64
 from pathlib import Path
 from envs import *
 import jax
@@ -6,6 +7,42 @@ import sys
 from agents import SACAgent
 from dm_env import StepType
 import yaml
+import IPython
+
+
+def evaluate(environment, agent, evaluation_episodes):
+  frames = []
+
+  for episode in range(evaluation_episodes):
+    timestep = environment.reset()
+    episode_return = 0
+    steps = 0
+    while not timestep.last():
+      frames.append(timestep.observation['rgb'])
+
+      action = agent.select_action(timestep.observation)
+      timestep = environment.step(action)
+      steps += 1
+      episode_return += timestep.reward
+    print(
+        f'Episode {episode} ended with reward {episode_return} in {steps} steps'
+    )
+  return frames
+
+def display_video(frames, filename='temp.mp4', frame_repeat=4):
+  """Save and display video."""
+  # Write video
+  with imageio.get_writer(filename, fps=60) as video:
+    for frame in frames:
+      for _ in range(frame_repeat):
+        video.append_data(frame)
+  # Read video and display the video
+  video = open(filename, 'rb').read()
+  b64_video = base64.b64encode(video)
+  video_tag = ('<video  width="320" height="240" controls alt="test" '
+               'src="data:video/mp4;base64,{0}">').format(b64_video.decode())
+  return IPython.display.HTML(video_tag)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -29,6 +66,7 @@ if __name__ == '__main__':
 
     train_every = config_args['train_interval']
     save_every = config_args['save_interval']
+    eval_every = config_args['eval_interval']
 
     for i in range(1, n_trajectories+1):
         print(f'trajectory {i}')
@@ -45,6 +83,8 @@ if __name__ == '__main__':
 
             if n_steps % train_every == 0:
                 actor_loss = agent.learner_step()
+            if n_steps % eval_every == 0:
+                display_video(evaluate(env, agent, evaluation_episodes=1))
 
         print(traj_reward)
         if i % save_every == 0:

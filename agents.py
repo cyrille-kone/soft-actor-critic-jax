@@ -208,6 +208,7 @@ class SACAgent(Agent):
         actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)( 
             actor_params, q, observations
         )
+
         actor_updates, actor_opt_state = self.actor_opt.update(actor_grads, actor_opt_state)
         actor_params = optax.apply_updates(actor_params, actor_updates)
         return actor_loss, actor_params, actor_opt_state

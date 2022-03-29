@@ -85,7 +85,7 @@ class PendulumEnv(MixinEnv):
 
 
 class PusherEnv(MixinEnv):
-    def __init__(self, seed: int, for_evaluation: bool, evaluation_video_path: Optional[str] = None,
+    def __init__(self, for_evaluation: bool, seed: int = 0, evaluation_video_path: Optional[str] = None,
                  deltat: float = .05, max_steps: int = 100) -> None:
         super().__init__(for_evaluation)
         self._state = None
