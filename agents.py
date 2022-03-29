@@ -213,6 +213,7 @@ class SACAgent(Agent):
         return actor_loss, actor_params, actor_opt_state
 
     def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
+        # Reward scale. Read 5.2 of the SAC paper.
         q_hat = batch.reward * self.reward_scale + (1-batch.done)*self.discount*\
                 self.value.apply(self.value_target_params, batch.next_state)
         def q_loss(q_params, q_hat, state, action):
