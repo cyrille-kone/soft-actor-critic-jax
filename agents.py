@@ -65,13 +65,9 @@ class SACAgent(Agent):
                             ValueNetwork(obs_dims,
                                          hidden_output_dims=hidden_dims,
                                          chkpt_dir=chkpt_dir)(x)))
-        self.value_target = hk.without_apply_rng(hk.transform(lambda x:
-                            ValueNetwork(obs_dims,
-                                         hidden_output_dims=hidden_dims,
-                                         chkpt_dir=chkpt_dir)(x)))
 
         # we use two distinct Q networks (see end of 4.2 in the paper)
-        self.Q = hk.without_apply_rng(hk.transform(lambda x:
+        self.Q1 = hk.without_apply_rng(hk.transform(lambda x:
                             CriticNetwork(obs_dims,
                                           action_dims,
                                           hidden_output_dims=hidden_dims,
@@ -128,11 +124,6 @@ class SACAgent(Agent):
         """
         self.rng, key = jax.random.split(self.rng, 2)
         mus, log_sigmas = self.actor.apply(self.actor_params, observations)
-        log_sigmas = jnp.clip(
-            jax.nn.softplus(log_sigmas),
-            -20,
-            2
-        )
 
         # see appendix C in SAC paper
 
@@ -145,7 +136,10 @@ class SACAgent(Agent):
         # compute squashed log-likelihood
         # ! other implementations put a relu in the log
         # + 1e-6 to prevent log(0)
-        log_probs -= jnp.sum(jnp.log(1 - jnp.tanh(actions)**2 + 1e-6), axis=1, keepdims=True)
+        log_probs -= jnp.sum(
+            jnp.log(jax.nn.relu(1 - jnp.tanh(actions)**2) + 1e-6),
+            axis=1, keepdims=True
+        )
 
         # squash actions to enforce action bounds
         actions = jnp.tanh(actions) * self.action_spec().maximum
@@ -209,11 +203,6 @@ class SACAgent(Agent):
 
         def actor_loss_fn(actor_params, key, q, observations):
             mus, log_sigmas = self.actor.apply(actor_params, observations)
-            log_sigmas = jnp.clip(
-                jax.nn.softplus(log_sigmas),
-                -20,
-                2
-            )
             # sample actions according to normal distributions via reparameterization trick
             actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
 
@@ -237,8 +226,8 @@ class SACAgent(Agent):
         return actor_loss, actor_params, actor_opt_state
 
     def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
-        q_hat = batch.reward + (1-batch.done)*self.discount*\
-                self.value_target.apply(self.value_target_params, batch.next_state)
+        q_hat = batch.reward * 20 + (1-batch.done)*self.discount*\
+                self.value.apply(self.value_target_params, batch.next_state)
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
             q_r = self.Q.apply(q_params, state_action_input)  # _r is for replay buffer
