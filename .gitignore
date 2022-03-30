@@ -1,7 +1,6 @@
 *~
 __pycache__/
 envdeeprl
-.gitignore
 Session.vim
 tmp.py
 
