@@ -24,10 +24,12 @@ Dans le notebook : j’arrive à les charger, je les wrap pour en faire des dm_e
 ## agents
 * Fichier agents.py -> jitted et modifié, donc accéléré. Dans la version précédente, il semble que les gradients soient nuls.
 * Fichier networks.py avec value, critic et actor -> fini (mais pas testé) (N) qui seront ensuite utilisés dans agents.py
+* modified the log_sigma value. Omit the softplus, use clipped value instead.
 
 ## training
 
 * Fichier train.py -> now use yaml config files for all parameters (saved in ./configs/)
+* added deterministic policy for evaluation. Achieved an average score of 25-35 (over 5 evaluation episodes) on Inverted Pendulum environment.
 
 Run code by
 ```
