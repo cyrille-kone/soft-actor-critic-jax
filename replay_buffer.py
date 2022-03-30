@@ -8,12 +8,15 @@ Transition = namedtuple('Transition', 'state action reward next_state done')
 class ReplayBuffer():
     """A simple replay buffer class to keep track of the agent's past experience"""
 
-    def __init__(self, obs_shape, action_shape, max_length=10_000):
+    def __init__(self, obs_shape, action_shape, max_length=1e6):
         self.obs_shape = obs_shape
         self.action_shape = action_shape
         self.max_length = max_length
 
         self._memory = []
+    
+    def __len__(self):
+        return len(self._memory)
 
     def store_transition(self, state, action, reward, next_state, done) -> None:
         while len(self._memory) >= self.max_length:

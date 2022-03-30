@@ -12,6 +12,9 @@ from utils import logger
 Critic, Value and Actor networks
 """
 
+LOG_SIG_CAP_MAX = 2
+LOG_SIG_CAP_MIN = -20
+
 
 # Inherits from MLP so no need to reimplement forward/__call__
 class CustomMLP(hk.nets.MLP):
@@ -120,7 +123,7 @@ class ActorNetwork(CustomMLP):
         # TODO: these next lines are present in other implementations, 
         # but i don't see where they are explained in the paper ?
 
-        log_sigma = jax.nn.softplus(log_sigma)  # soft relu
+        log_sigma = jnp.clip(log_sigma, LOG_SIG_CAP_MIN, LOG_SIG_CAP_MAX)
         # log_sigma = jnp.clip(log_sigma, min=jnp.log(self.reparam_noise))  # prevent -inf values
         return mu, log_sigma  # need to reshape that ?
 

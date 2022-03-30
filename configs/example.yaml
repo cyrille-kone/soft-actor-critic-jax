@@ -1,4 +1,4 @@
-env: PendulumEnv
+env: PusherEnv
 seed: 0
 n_trajectories: 2000
 max_steps_per_episode: 150

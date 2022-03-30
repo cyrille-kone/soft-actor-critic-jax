@@ -54,6 +54,7 @@ class SACAgent(Agent):
                  discount=0.99,
                  tau=0.005, # target smoothing coefficient,
                  target_period_update=1,
+                 reward_scale=1.,
                  chkpt_dir=None):
 
         obs_dims = obs_spec().shape[0]
@@ -62,10 +63,6 @@ class SACAgent(Agent):
 
         print("initializing networks")
         self.value = hk.without_apply_rng(hk.transform(lambda x:
-                            ValueNetwork(obs_dims,
-                                         hidden_output_dims=hidden_dims,
-                                         chkpt_dir=chkpt_dir)(x)))
-        self.value_target = hk.without_apply_rng(hk.transform(lambda x:
                             ValueNetwork(obs_dims,
                                          hidden_output_dims=hidden_dims,
                                          chkpt_dir=chkpt_dir)(x)))
@@ -89,6 +86,7 @@ class SACAgent(Agent):
         self.batch_size = batch_size
         self.discount = discount
         self.tau = tau
+        self.reward_scale = reward_scale
 
         # initialize networks parameters
         self.rng, value_key, Q1_key, Q2_key, actor_key = jax.random.split(self.rng, 5)
@@ -116,47 +114,57 @@ class SACAgent(Agent):
         self.update_q = jax.jit(self._update_q)
 
     # is this supposed to be batched_actor_step ?
-    def select_actions(self, observations: chex.Array) -> chex.Array:
+    def select_actions(self, actor_params, observations: chex.Array, key, deterministic=False) -> chex.Array:
         """
         observations: chex.Array
                 batch of states
+        deterministic: bool
+                use deterministic policy improve performance during the
+                evaluation. Read 5.2 of the SAC paper.
 
         for each observations, generates action distribution from actor
         and samples from this distribution
         also computes log_probs, to compute loss function
         return: actions, log_probs
         """
-        self.rng, key = jax.random.split(self.rng, 2)
-        mus, log_sigmas = self.actor.apply(self.actor_params, observations)
-
+        mus, log_sigmas = self.actor.apply(actor_params, observations)
         # see appendix C in SAC paper
 
+        if deterministic:
+            return jnp.tanh(mus) * self.action_spec().maximum, None
+
         # sample actions according to normal distributions
-        actions = jax.random.multivariate_normal(key, mus, jnp.array([jnp.diag(jnp.exp(s)) for s in log_sigmas]))
+        actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
 
         # compute log_likelihood of the sampled actions
-        log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/(2*jnp.exp(log_sigmas)))**2
-
-        # squash actions to enforce action bounds
-        actions = jnp.tanh(actions) * (self.action_spec().maximum - self.action_spec().minimum)
+        log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - 0.5*((actions-mus)/jnp.exp(log_sigmas))**2
 
         # compute squashed log-likelihood
         # ! other implementations put a relu in the log
         # + 1e-6 to prevent log(0)
-        log_probs -= jnp.sum(jnp.log(1 - jnp.tanh(actions)**2 + 1e-6), axis=1, keepdims=True)
+        log_probs -= jnp.sum(
+            jnp.log(1 - jnp.tanh(actions)**2 + 1e-6),
+            axis=1, keepdims=True
+        )
 
+        # squash actions to enforce action bounds
+        actions = jnp.tanh(actions) * self.action_spec().maximum
 
         return actions, log_probs
 
-    def select_action(self, obs: chex.Array) -> chex.Array:
+    def select_action(self, obs: chex.Array, deterministic=False) -> chex.Array:
         """
         obs: chex.Array
                 a single observation
+        deterministic: bool
+                use deterministic policy improve performance during the
+                evaluation. Read 5.2 of the SAC paper.
         returns a single action sampled from actor's  distribution
 
         This is meant to be used while interacting with the environment
         """
-        action, _ = self.select_actions(jnp.expand_dims(obs, 0))
+        self.rng, key = jax.random.split(self.rng, 2)
+        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), key, deterministic)
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
@@ -187,7 +195,17 @@ class SACAgent(Agent):
     def load_checkpoint(self, chkpt_dir):
         pass
 
-    def _update_value(self, value_params, value_opt_state, state, q, log_probs):
+    def _update_value(self, value_params, value_opt_state, key, state):
+        # compute actions and log_probs from current policy
+        actions, log_probs = self.select_actions(self.actor_params, state, key)
+
+        # get minimum Q value (see end of 4.2 in the paper)
+        # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
+        state_action_input = jnp.concatenate((state, actions), axis=1)
+        
+        q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
+        q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
+        q = jnp.minimum(q1, q2)
 
         def value_loss_fn(value_params, state, target):
             value = self.value.apply(value_params, state)
@@ -198,35 +216,29 @@ class SACAgent(Agent):
         value_params = optax.apply_updates(value_params, value_updates)
         return value_params, value_opt_state
 
-    def _update_actor(self, actor_params, actor_opt_state, key, q, observations):
+    def _update_actor(self, actor_params, actor_opt_state, key, state):
 
-        def actor_loss_fn(actor_params, key, q, observations):
-            mus, log_sigmas = self.actor.apply(actor_params, observations)
-            # sample actions according to normal distributions via reparameterization trick
-            actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
-
-            # compute log_likelihood of the sampled actions
-            log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - ((actions-mus)/2/jnp.exp(log_sigmas))**2
-
-            # squash actions to enforce action bounds
-            actions = jnp.tanh(actions) * self.action_spec().maximum
-
-            # compute squashed log-likelihood
-            # ! other implementations put a relu in the log
-            # + 1e-6 to prevent log(0)
-            log_probs -= jnp.sum(jnp.log(1 - jnp.tanh(actions)**2 + 1e-6), axis=1, keepdims=True)
+        def actor_loss_fn(actor_params, observations):
+            actions, log_probs = self.select_actions(actor_params, observations, key)
+            state_action_input = jnp.concatenate((state, actions), axis=1)
+        
+            q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
+            q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
+            q = jnp.minimum(q1, q2)
             return (log_probs - q).mean()
-
-        actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)(
-            actor_params, key, q, observations
+        
+        actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)( 
+            actor_params, state
         )
+
         actor_updates, actor_opt_state = self.actor_opt.update(actor_grads, actor_opt_state)
         actor_params = optax.apply_updates(actor_params, actor_updates)
         return actor_loss, actor_params, actor_opt_state
 
     def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
-        q_hat = batch.reward + (1-batch.done)*self.discount*\
-                self.value_target.apply(self.value_target_params, batch.next_state)
+        # Reward scale. Read 5.2 of the SAC paper.
+        q_hat = batch.reward * self.reward_scale + (1-batch.done)*self.discount*\
+                self.value.apply(self.value_target_params, batch.next_state)
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
             q_r = self.Q.apply(q_params, state_action_input)  # _r is for replay buffer
@@ -247,40 +259,13 @@ class SACAgent(Agent):
         self.rng, key = jax.random.split(self.rng, 2)
         batch = self.memory.sample_batch(self.batch_size, key)
 
-        # compute actions and log_probs from current policy
-        actions, log_probs = self.select_actions(batch.state)
-
-        # get minimum Q value (see end of 4.2 in the paper)
-        # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
-        state_action_input = jnp.concatenate((batch.state, actions), axis=1)
-        q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
-        q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
-        q = jnp.minimum(q1, q2)
-
-        # compute value
-        # value = self.value.apply(self.value_params, batch.state)
-
+        self.rng, key = jax.random.split(self.rng, 2)
         # compute value gradients and update value network
         self.value_params, self.value_opt_state = self.update_value(
             self.value_params, self.value_opt_state,
-            batch.state, q, log_probs
+            key, batch.state
         )
         # !! I didn't understand what the "reparameterization trick" was so I didn't code it yet
-
-        # compute actor gradients and update actor network
-        actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
-            self.actor_params, self.actor_opt_state,
-            key, q, batch.state
-        )
-
-        # get q_hat (see eq. 8 in paper)
-        # q_hat = batch.reward + (1-batch.done)*self.discount*\
-        #         self.value_target.apply(self.value_target_params, batch.next_state)
-
-        # compute q (use actions from replay buffer this time (paper eq. 7))
-        # state_action_input = jnp.concatenate((batch.state, batch.action), axis=1)
-        # q1_r = self.Q1.apply(self.Q1_params, state_action_input)  # _r is for replay buffer
-        # q2_r = self.Q2.apply(self.Q2_params, state_action_input)
 
         # compute q gradients and update critic networks
         self.Q1_params, self.Q1_opt_state, self.Q2_params, self.Q2_opt_state = self.update_q(
@@ -289,8 +274,13 @@ class SACAgent(Agent):
             batch
         )
 
-        # soft-update target value network parameters 
-        # jax.tree_multimap applies update recursively to weight and biases of the layers of the networks
+        # compute actor gradients and update actor network
+        self.rng, key = jax.random.split(self.rng, 2)
+        actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
+            self.actor_params, self.actor_opt_state,
+            key, batch.state
+        )
+
         self.value_target_params = jax.tree_multimap(
             lambda params, target_params: self.tau*params + (1-self.tau)*target_params,
             self.value_params, self.value_target_params)
