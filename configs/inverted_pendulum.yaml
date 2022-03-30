@@ -1,7 +1,7 @@
-env: PendulumEnv
+env: InvertedPendulumEnv
 seed: 0
 n_trajectories: 2000
-max_steps_per_episode: 150
+max_steps_per_episode: 50
 train_interval: 1
 save_interval: 100
 max_thread: -1

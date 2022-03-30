@@ -1,29 +1,31 @@
-import envs
+import argparse
+from pathlib import Path
+from envs import *
 import jax
+import sys
 from agents import SACAgent
 from dm_env import StepType
 import yaml
 
 if __name__ == '__main__':
-    env = envs.PendulumEnv(for_evaluation=False)
-    n_trajectories = 2000
-    # checkpoint_file = 
-    # plot file = 
-    with open('./configs/example.yaml', 'r') as f:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='./configs/example.yaml', type=str)
+    args = parser.parse_args()
+    with open(Path(args.config), 'r') as f:
         config_args = yaml.safe_load(f.read())
-    print(config_args['env'])
-    seed = 0
+    env = eval(config_args['env'])(for_evaluation=False)
+    n_trajectories = config_args['n_trajectories']
+    seed = config_args['seed']
     rng = jax.random.PRNGKey(seed)
 
-    agent = SACAgent(rng, env.observation_spec, env.action_spec, hidden_output_dims=(10, 10))
-
+    agent = SACAgent(rng, env.observation_spec, env.action_spec, **config_args['agent_kwargs'])
 
     best_reward = 0   # env.reward_spec().minimum() ?  # should be min reward possible
     all_rewards = []  # for future plotting
-    max_steps = 500   # maximum number of steps in a trajectory to prevent infinite loops
+    max_steps = config_args['max_steps_per_episode']   # maximum number of steps in a trajectory to prevent infinite loops
 
-    train_every = 10
-    save_every = 100
+    train_every = config_args['train_interval']
+    save_every = config_args['save_interval']
 
     for i in range(1, n_trajectories+1):
         print(f'trajectory {i}')
@@ -45,7 +47,7 @@ if __name__ == '__main__':
         print(traj_reward)
 
         if i % save_every == 0:
-            agent.save_checkpoint(chkpt_dir='dir_save/', id=f'{i}')
+            agent.save_checkpoint('dir_save')
 
         if traj_reward > best_reward:
             best_reward = traj_reward
