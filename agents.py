@@ -50,7 +50,7 @@ class SACAgent(Agent):
                  hidden_output_dims = (256, 256),
                  gamma=0.99,
                  tau=0.005, # target smoothing coefficient,
-                 target_update=1000,
+                 target_update=1000,  # unused when using soft update
                  chkpt_dir=None):
 
         obs_dims = obs_spec().shape[0]
@@ -165,7 +165,7 @@ class SACAgent(Agent):
         """soft update of network parameters"""
         pass
 
-    def save_checkpoint(chkpt_dir):
+    def save_checkpoint(chkpt_dir, id=''):
         """uses networks save_checkpoint methods"""
         pass
 

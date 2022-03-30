@@ -15,7 +15,7 @@ if __name__ == '__main__':
     seed = 0
     rng = jax.random.PRNGKey(seed)
 
-    agent = SACAgent(rng, env.observation_spec, env.action_spec)
+    agent = SACAgent(rng, env.observation_spec, env.action_spec, hidden_output_dims=(10, 10))
 
 
     best_reward = 0   # env.reward_spec().minimum() ?  # should be min reward possible
@@ -41,9 +41,8 @@ if __name__ == '__main__':
             if n_steps % train_every == 0:
                 actor_loss = agent.learner_step()
 
+        print(n_steps)
         print(traj_reward)
-            if i % save_every == 0:
-                agent.save_checkpoint(chkpt_dir='dir_save/', id='{i}')
 
         if i % save_every == 0:
             agent.save_checkpoint(chkpt_dir='dir_save/', id=f'{i}')
