@@ -173,18 +173,16 @@ class SACAgent(Agent):
     def update_target_network(self, ):
         """soft update of network parameters"""
         pass
-    
+
     # @partial(jax.jit, static_argnums=(0,))
     # def update_value_network(self, value, soft_value):
     #     value_grads = jax.grad(self.value_loss)(self.value_params, batch, q-log_probs)
     #     value_updates, self.value_opt_state = self.value_opt.update(value_grads, self.value_opt_state)
     #     self.value_params = optax.apply_updates(self.value_params, value_updates)
-    
     # def update_actor(self, log_probs, q):
     #     actor_loss, actor_grads = jax.value_and_grad(self.actor_loss)(self.actor_params, log_probs, q)
     #     actor_updates, self.actor_opt_state = self.actor_opt.update(actor_grads, self.actor_opt_state)
     #     self.actor_params = optax.apply_updates(self.actor_params, actor_updates)
-    
     # def update_critic(self, q1_r, q_hat):
     #     q1_grads = jax.grad(self.critic_loss)(self.Q1_params, q1_r, q_hat)
     #     q1_updates, self.Q1_opt_state = self.Q1_opt.update(q1_grads, self.Q1_opt_state)
@@ -212,7 +210,7 @@ class SACAgent(Agent):
         def value_loss_fn(value_params, state, target):
             value = self.value.apply(value_params, state)
             return 0.5*mse_loss(value, target)
-        
+
         value_grads = jax.grad(value_loss_fn)(value_params, state, q-log_probs)
         value_updates, value_opt_state = self.value_opt.update(value_grads, value_opt_state)
         value_params = optax.apply_updates(value_params, value_updates)
@@ -245,7 +243,7 @@ class SACAgent(Agent):
             state_action_input = jnp.concatenate((state, action), axis=1)
             q_r = self.Q.apply(q_params, state_action_input)  # _r is for replay buffer
             return 0.5*mse_loss(q_r, q_hat)
-        
+
         q1_grads = jax.grad(q_loss)(q1_params, q_hat, batch.state, batch.action)
         q1_updates, q1_opt_state = self.Q1_opt.update(q1_grads, q1_opt_state)
         q1_params = optax.apply_updates(q1_params, q1_updates)

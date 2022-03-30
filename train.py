@@ -60,7 +60,6 @@ if __name__ == '__main__':
     config_args['agent_kwargs']['reward_scale'] = args.r_scale
     agent = SACAgent(rng, env.observation_spec, env.action_spec, **config_args['agent_kwargs'])
 
-
     best_reward = 0   # env.reward_spec().minimum() ?  # should be min reward possible
     all_rewards = []  # for future plotting
     max_steps = config_args['max_steps_per_episode']   # maximum number of steps in a trajectory to prevent infinite loops
