@@ -4,7 +4,7 @@ from pathlib import Path
 from envs import *
 import jax
 import sys
-from agents import SACAgent
+from agents import SACAgent, RandomAgent
 from dm_env import StepType
 import yaml
 import IPython
@@ -59,6 +59,7 @@ if __name__ == '__main__':
 
     config_args['agent_kwargs']['reward_scale'] = args.r_scale
     agent = SACAgent(rng, env.observation_spec, env.action_spec, **config_args['agent_kwargs'])
+    # agent = RandomAgent(rng, env.observation_spec, env.action_spec)
 
     best_reward = 0   # env.reward_spec().minimum() ?  # should be min reward possible
     all_rewards = []  # for future plotting
@@ -69,12 +70,12 @@ if __name__ == '__main__':
     eval_every = config_args['eval_interval']
 
     for i in range(1, n_trajectories+1):
-        # print(f'trajectory {i}')
         timestep = env.reset()
         traj_reward = 0
         n_steps = 0
         while timestep.step_type != StepType.LAST and n_steps <= max_steps:
             action = agent.select_action(timestep.observation)
+            # print(round(action[0], 2), "\t", end="")
             timestep_ = env.step(action)  # underscore denotes timestep t+1
             agent.record(timestep, action, timestep_)
             traj_reward += timestep_.reward
@@ -83,16 +84,14 @@ if __name__ == '__main__':
 
             if n_steps % train_every == 0 and len(agent.memory) >= agent.batch_size:
                 actor_loss = agent.learner_step()
+        print(f"Trajectory\t{i}/{n_trajectories}")
+        print(f"Reward \t {traj_reward}, Best \t {best_reward}")
         if i % eval_every == 0:
             evaluate(env, agent, evaluation_episodes=5)
-
-        # print(traj_reward)
 
         if i % save_every == 0:
             agent.save_checkpoint('dir_save')
 
         if traj_reward > best_reward:
             best_reward = traj_reward
-            print("Trajectory\t{i}/{n_trajectories}")
-            print("Reward \t {traj_reward}, Best \t {best_reward}")
 

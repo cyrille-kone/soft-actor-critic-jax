@@ -1,9 +1,4 @@
 # coding=utf-8
-"""
-PyCharm Editor
-@ git Team
-"""
-import abc
 from functools import partial
 import acme
 import jax
@@ -19,29 +14,7 @@ from replay_buffer import ReplayBuffer
 from utils import mse_loss
 
 
-# A very simple agent API, with just enough to interact with the environment
-# and to update its potential parameters.
-class Agent(object):
-    @abc.abstractmethod
-    def learner_step(self, trajectory: Trajectory) -> Mapping[str, chex.ArrayNumpy]:
-        """One step of learning on a trajectory.
-
-        The mapping returned can contain various logs.
-        """
-        pass
-
-    @abc.abstractmethod
-    def batched_actor_step(self, observations: acme.types.NestedArray) -> acme.types.NestedArray:
-        """Returns actions in response to observations.
-
-        Observations are assumed to be batched, i.e. they are typically arrays, or
-        nests (think nested dictionaries) of arrays with shape (B, F_1, F_2, ...)
-        where B is the batch size, and F_1, F_2, ... are feature dimensions.
-        """
-        pass
-
-
-class SACAgent(Agent):
+class SACAgent():
     def __init__(self,
                  rng,
                  obs_spec,
@@ -109,32 +82,41 @@ class SACAgent(Agent):
         self.Q2_opt_state = self.Q2_opt.init(self.Q2_params)
         self.actor_opt_state = self.actor_opt.init(self.actor_params)
 
+        # jax.jit some functions
         self.update_value = jax.jit(self._update_value)
         self.update_actor = jax.jit(self._update_actor)
         self.update_q = jax.jit(self._update_q)
 
-    # is this supposed to be batched_actor_step ?
-    def select_actions(self, actor_params, observations: chex.Array, key, deterministic=False) -> chex.Array:
+
+    def select_actions(self, actor_params, observations: chex.Array, key, deterministic=False, reparameterize=True) -> chex.Array:
         """
+        Params
+
         observations: chex.Array
                 batch of states
         deterministic: bool
                 use deterministic policy improve performance during the
                 evaluation. Read 5.2 of the SAC paper.
+        -----------------------
+        Return
+                actions, log_probs
+        -----------------------
 
-        for each observations, generates action distribution from actor
+        For each observations, generates action distribution from actor
         and samples from this distribution
         also computes log_probs, to compute loss function
-        return: actions, log_probs
         """
         mus, log_sigmas = self.actor.apply(actor_params, observations)
-        # see appendix C in SAC paper
 
         if deterministic:
             return jnp.tanh(mus) * self.action_spec().maximum, None
 
         # sample actions according to normal distributions
         actions = mus + jax.random.normal(key, mus.shape) * jnp.exp(log_sigmas)
+
+        # squash actions to enforce action bounds
+        # (see appendix C in SAC paper)
+        actions = jnp.tanh(actions) * self.action_spec().maximum
 
         # compute log_likelihood of the sampled actions
         log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - 0.5*((actions-mus)/jnp.exp(log_sigmas))**2
@@ -147,46 +129,29 @@ class SACAgent(Agent):
             axis=1, keepdims=True
         )
 
-        # squash actions to enforce action bounds
-        actions = jnp.tanh(actions) * self.action_spec().maximum
-
         return actions, log_probs
 
     def select_action(self, obs: chex.Array, deterministic=False) -> chex.Array:
         """
+        Params
+
         obs: chex.Array
                 a single observation
         deterministic: bool
                 use deterministic policy improve performance during the
                 evaluation. Read 5.2 of the SAC paper.
-        returns a single action sampled from actor's  distribution
+        ------------------
 
-        This is meant to be used while interacting with the environment
+        Returns a single action sampled from actor's  distribution.
+        This is meant to be used while interacting with the environment.
         """
         self.rng, key = jax.random.split(self.rng, 2)
         action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), key, deterministic)
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
+        """Records a transition in replay buffer"""
         self.memory.store_transition(t.observation, action, t_.reward, t_.observation, t_.step_type)
-
-    def update_target_network(self, ):
-        """soft update of network parameters"""
-        pass
-
-    # @partial(jax.jit, static_argnums=(0,))
-    # def update_value_network(self, value, soft_value):
-    #     value_grads = jax.grad(self.value_loss)(self.value_params, batch, q-log_probs)
-    #     value_updates, self.value_opt_state = self.value_opt.update(value_grads, self.value_opt_state)
-    #     self.value_params = optax.apply_updates(self.value_params, value_updates)
-    # def update_actor(self, log_probs, q):
-    #     actor_loss, actor_grads = jax.value_and_grad(self.actor_loss)(self.actor_params, log_probs, q)
-    #     actor_updates, self.actor_opt_state = self.actor_opt.update(actor_grads, self.actor_opt_state)
-    #     self.actor_params = optax.apply_updates(self.actor_params, actor_updates)
-    # def update_critic(self, q1_r, q_hat):
-    #     q1_grads = jax.grad(self.critic_loss)(self.Q1_params, q1_r, q_hat)
-    #     q1_updates, self.Q1_opt_state = self.Q1_opt.update(q1_grads, self.Q1_opt_state)
-    #     self.Q1_params = optax.apply_updates(self.Q1_params, q1_updates)
 
     def save_checkpoint(self, chkpt_dir):
         """uses networks save_checkpoint methods"""
@@ -195,23 +160,22 @@ class SACAgent(Agent):
     def load_checkpoint(self, chkpt_dir):
         pass
 
-    def _update_value(self, value_params, value_opt_state, key, state):
+    def _update_value(self, value_params, value_opt_state, key, batch):
         # compute actions and log_probs from current policy
-        actions, log_probs = self.select_actions(self.actor_params, state, key)
+        actions, log_probs = self.select_actions(self.actor_params, batch.state, key)
 
         # get minimum Q value (see end of 4.2 in the paper)
         # use actions from current policy and not from replay buffer (see 4.2 just after eq.6)
-        state_action_input = jnp.concatenate((state, actions), axis=1)
-        
+        state_action_input = jnp.concatenate((batch.state, actions), axis=1)
         q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
         q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
         q = jnp.minimum(q1, q2)
 
-        def value_loss_fn(value_params, state, target):
-            value = self.value.apply(value_params, state)
+        def value_loss_fn(value_params, batch, target):
+            value = (1-batch.done)*self.value.apply(value_params, batch.state)
             return 0.5*mse_loss(value, target)
 
-        value_grads = jax.grad(value_loss_fn)(value_params, state, q-log_probs)
+        value_grads = jax.grad(value_loss_fn)(value_params, batch, (q-log_probs).mean(axis=1))
         value_updates, value_opt_state = self.value_opt.update(value_grads, value_opt_state)
         value_params = optax.apply_updates(value_params, value_updates)
         return value_params, value_opt_state
@@ -221,13 +185,13 @@ class SACAgent(Agent):
         def actor_loss_fn(actor_params, observations):
             actions, log_probs = self.select_actions(actor_params, observations, key)
             state_action_input = jnp.concatenate((state, actions), axis=1)
-        
+
             q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
             q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
             q = jnp.minimum(q1, q2)
             return (log_probs - q).mean()
-        
-        actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)( 
+
+        actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)(
             actor_params, state
         )
 
@@ -238,12 +202,13 @@ class SACAgent(Agent):
     def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
         # Reward scale. Read 5.2 of the SAC paper.
         q_hat = batch.reward * self.reward_scale + (1-batch.done)*self.discount*\
-                self.value.apply(self.value_target_params, batch.next_state)
+                (self.value.apply(self.value_target_params, batch.next_state)).mean()
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
             q_r = self.Q.apply(q_params, state_action_input)  # _r is for replay buffer
             return 0.5*mse_loss(q_r, q_hat)
 
+        # Compute loss using actions from replay buffer
         q1_grads = jax.grad(q_loss)(q1_params, q_hat, batch.state, batch.action)
         q1_updates, q1_opt_state = self.Q1_opt.update(q1_grads, q1_opt_state)
         q1_params = optax.apply_updates(q1_params, q1_updates)
@@ -260,21 +225,20 @@ class SACAgent(Agent):
         batch = self.memory.sample_batch(self.batch_size, key)
 
         self.rng, key = jax.random.split(self.rng, 2)
-        # compute value gradients and update value network
+        # update value network
         self.value_params, self.value_opt_state = self.update_value(
             self.value_params, self.value_opt_state,
-            key, batch.state
+            key, batch
         )
-        # !! I didn't understand what the "reparameterization trick" was so I didn't code it yet
 
-        # compute q gradients and update critic networks
+        # update critic (Q) networks
         self.Q1_params, self.Q1_opt_state, self.Q2_params, self.Q2_opt_state = self.update_q(
             self.Q1_params, self.Q1_opt_state,
             self.Q2_params, self.Q2_opt_state,
             batch
         )
 
-        # compute actor gradients and update actor network
+        # update actor network
         self.rng, key = jax.random.split(self.rng, 2)
         actor_loss, self.actor_params, self.actor_opt_state = self.update_actor(
             self.actor_params, self.actor_opt_state,
@@ -287,3 +251,25 @@ class SACAgent(Agent):
 
         return actor_loss
 
+class RandomAgent():
+    def __init__(self,
+                 rng,
+                 obs_spec,
+                 action_spec):
+        self.rng = rng
+        self.action_spec = action_spec
+        self.memory = [0]
+        self.batch_size = 0
+
+    def select_action(self, obs, deterministic=False):
+        self.rng, key = jax.random.split(self.rng, 2)
+        return jax.random.uniform(key, self.action_spec().shape)
+
+    def learner_step(self):
+        return 0
+
+    def record(self, a, b, c):
+        pass
+
+    def save_checkpoint(self, chkpt_dir):
+        pass

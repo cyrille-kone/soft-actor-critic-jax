@@ -114,16 +114,12 @@ class ActorNetwork(CustomMLP):
         )
 
         self._expected_input_dims = obs_dims
-        self.reparam_noise = 1e-6
 
     def __call__(self, state: chex.Array) -> chex.Array:
         h = super().__call__(state)
         mu, log_sigma = jnp.split(h, 2, axis=-1)
 
-        # TODO: these next lines are present in other implementations, 
-        # but i don't see where they are explained in the paper ?
-
-        # log_sigma = jnp.clip(log_sigma, LOG_SIG_CAP_MIN, LOG_SIG_CAP_MAX)
-        log_sigma = jnp.clip(log_sigma, -10, 2)  # prevent -inf values
-        return mu, log_sigma  # need to reshape that ?
+        log_sigma = jnp.clip(log_sigma, LOG_SIG_CAP_MIN, LOG_SIG_CAP_MAX)
+        # log_sigma = jnp.clip(log_sigma, -10, 2)  # prevent -inf values
+        return mu, log_sigma
 
