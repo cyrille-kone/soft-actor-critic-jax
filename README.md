@@ -3,7 +3,8 @@ This is the repo for the project of implementing the algorithm from the paper <a
 
 ## Installation 
 
-If you want to run the code on mujoco environments, make sure [mujoco](https://github.com/openai/mujoco-py) is installed on your computer
+If you want to run the code on mujoco environments, make sure [mujoco](https://github.com/openai/mujoco-py) is installed on your computer.
+Then run the following commands
 ```bash
 git clone https://github.com/cyrille-kone/deep-rl
 cd deep-rl
@@ -12,13 +13,14 @@ source envsac/bin/activate
 pip install --upgrade -r requirements.txt
 ```
 
-## Run 
+## Run
+The config file contains all the agent hyperparameters as well as other options
 ```bash
 python train.py --config "configs/sac.yaml"
 ```
 
 ## Plot results
-After training, you can plot results by running
+After training, you can plot results by running. If you have specified a different output file for plotting, you can replace the command argument by the name of your file.
 ```bash
 python plot.py to_plot.log
 ```
