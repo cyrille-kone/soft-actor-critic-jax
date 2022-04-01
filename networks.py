@@ -16,7 +16,6 @@ LOG_SIG_CAP_MAX = 2
 LOG_SIG_CAP_MIN = -20
 
 
-# Inherits from MLP so no need to reimplement forward/__call__
 class CustomMLP(hk.nets.MLP):
     """
     General MLP class for checkpoint saving/loading.
@@ -35,42 +34,12 @@ class CustomMLP(hk.nets.MLP):
             raise NotImplemented
 
         super().__init__(output_sizes=output_sizes, activation=activation)
-        # create checkpoint dir if it doesn't exist
-        if chkpt_dir is not None:
-            if not os.path.exists(chkpt_dir):
-                os.mkdir(chkpt_dir)
-
-        self.chkpt_dir = chkpt_dir
-        self.chkpt_file = None           # will be set when saving
-
         self._expected_input_dims = None  # should be set in child classes
 
     def __call__(self, x: chex.Array) -> chex.Array:
         assert x.shape[-1] == self._expected_input_dims,\
         f"input dimension {x.shape} doesn't match expected dimension [batch_size, {self._expected_input_dims}]"
         return super().__call__(x)
-
-    def save_checkpoint(self, file=None):
-        """call with a unique filename, otherwise previous file will be overwrited"""
-        logger.info(f'Saving value network to {self.chkpt_dir}/{file}')
-        if file is not None:
-            self.chkpt_file = file
-        with open(os.path.join(self.chkpt_dir, self.chkpt_file), 'wb') as f:
-            pickle.dump(self.params_dict(), f)
-
-    def load_checkpoint(self, file=None):
-        """loads last saved checkpoint by default"""
-        logger.info(f'Loading value network from {self.chkpt_dir}/{file}')
-        if file is not None:
-            self.chkpt_file = file
-
-        if not os.path.exists(os.path.join(self.chkpt_dir, self.chkpt_file)):
-            logger.warning('could not load checkpoint file (file not found)')
-            return None
-
-        with open(os.path.join(self.chkpt_dir, self.chkpt_file), 'rb') as f:
-            print(self.params_dict)
-            self.params_dict = pickle.load(f)
 
 
 class CriticNetwork(CustomMLP):
@@ -113,13 +82,12 @@ class ActorNetwork(CustomMLP):
             chkpt_dir=chkpt_dir
         )
 
-        self._expected_input_dims = obs_dims
+        self._expected_input_dims = obs_dims  # to assert correct input dims
 
     def __call__(self, state: chex.Array) -> chex.Array:
         h = super().__call__(state)
         mu, log_sigma = jnp.split(h, 2, axis=-1)
 
-        log_sigma = jnp.clip(log_sigma, LOG_SIG_CAP_MIN, LOG_SIG_CAP_MAX)
-        # log_sigma = jnp.clip(log_sigma, -10, 2)  # prevent -inf values
+        log_sigma = jnp.clip(log_sigma, LOG_SIG_CAP_MIN, LOG_SIG_CAP_MAX)  # to prefent -inf values
         return mu, log_sigma
 
