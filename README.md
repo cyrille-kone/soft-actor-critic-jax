@@ -3,6 +3,7 @@ This is the repo for the project of implementing the algorithm from the paper <a
 
 ## Installation 
 
+If you want to run the code on mujoco environments, make sure [mujoco](https://github.com/openai/mujoco-py) is installed on your computer
 ```bash
 git clone https://github.com/cyrille-kone/deep-rl
 cd deep-rl
@@ -13,13 +14,15 @@ pip install --upgrade -r requirements.txt
 
 ## Run 
 ```bash
-python train.py --config "configs/example.yaml"
+python train.py --config "configs/sac.yaml"
 ```
 
-# TODO
-You may decide to run a part of our experiments by executing the command for the sections below. 
+## Plot results
+After training, you can plot results by running
+```bash
+python plot.py to_plot.log
+```
 
-<code> #TODO </code>
 ## Resources 
 # TODO 
 https://arxiv.org/abs/1801.01290
