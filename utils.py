@@ -1,22 +1,26 @@
 # coding=utf-8
-r"""
-@git  Team
-PyCharm Editor
-"""
 import logging
 import configparser
 from pathlib import Path
 import sys
 from typing import Optional, List
 import jax.numpy as jnp
+import sys
 
-# configure logger for the module
+# configure console logger for the module
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
 # create console handler
-handler = logging.StreamHandler()
+handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+handler.setLevel(logging.INFO)
 logger.addHandler(handler)
-
+# create file handler
+file_handler = logging.FileHandler("to_plot.log", 'w')
+file_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+file_handler.setLevel(logging.DEBUG)
+logger.addHandler(file_handler)
 
 def load_config(*argkeys, **IGNORE):
     r'''

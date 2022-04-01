@@ -11,7 +11,7 @@ from typing import Mapping
 from new_types import Trajectory
 from networks import ValueNetwork, CriticNetwork, ActorNetwork
 from replay_buffer import ReplayBuffer
-from utils import mse_loss
+from utils import mse_loss, logger
 
 
 class SACAgent():
@@ -28,13 +28,13 @@ class SACAgent():
                  tau=0.005, # target smoothing coefficient,
                  target_period_update=1,
                  reward_scale=1.,
-                 chkpt_dir=None):
+                 chkpt_dir=None,
+                 jit=True):
 
         obs_dims = obs_spec().shape[0]
         action_dims = action_spec().shape[0]
         self.memory = ReplayBuffer(obs_dims, action_dims)
 
-        print("initializing networks")
         self.value = hk.without_apply_rng(hk.transform(lambda x:
                             ValueNetwork(obs_dims,
                                          hidden_output_dims=hidden_dims,
@@ -82,13 +82,20 @@ class SACAgent():
         self.Q2_opt_state = self.Q2_opt.init(self.Q2_params)
         self.actor_opt_state = self.actor_opt.init(self.actor_params)
 
-        # jax.jit some functions
-        self.update_value = jax.jit(self._update_value)
-        self.update_actor = jax.jit(self._update_actor)
-        self.update_q = jax.jit(self._update_q)
+        if jit:
+            # jax.jit some functions
+            self.update_value = jax.jit(self._update_value)
+            self.update_actor = jax.jit(self._update_actor)
+            self.update_q = jax.jit(self._update_q)
+        else:
+            self.update_value = self._update_value
+            self.update_actor = self._update_actor
+            self.update_q = self._update_q
 
 
-    def select_actions(self, actor_params, observations: chex.Array, key, deterministic=False, reparameterize=True) -> chex.Array:
+
+
+    def select_actions(self, actor_params, observations: chex.Array, key, deterministic=False, logging=False) -> chex.Array:
         """
         Params
 
@@ -128,10 +135,15 @@ class SACAgent():
             jnp.log(1 - jnp.tanh(actions)**2 + 1e-6),
             axis=1, keepdims=True
         )
-
+        if logging:
+            logger.debug('mus ' + f'{mus[0][0]}')
+            logger.debug('squashed_mus ' + f'{(jnp.tanh(mus[0][0])*self.action_spec().maximum)}')
+            logger.debug('sigmas ' + f'{jnp.exp(log_sigmas)[0][0]}')
+            logger.debug('actions ' + f'{actions[0][0]}')
+            logger.debug('log_probs ' + f'{log_probs[0][0]}')
         return actions, log_probs
 
-    def select_action(self, obs: chex.Array, deterministic=False) -> chex.Array:
+    def select_action(self, obs: chex.Array, deterministic=False, logging=False) -> chex.Array:
         """
         Params
 
@@ -146,7 +158,7 @@ class SACAgent():
         This is meant to be used while interacting with the environment.
         """
         self.rng, key = jax.random.split(self.rng, 2)
-        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), key, deterministic)
+        action, _ = self.select_actions(self.actor_params, jnp.expand_dims(obs, 0), key, deterministic, logging=logging)
         return action.squeeze(axis=0)
 
     def record(self, t, action, t_):
@@ -172,12 +184,14 @@ class SACAgent():
         q = jnp.minimum(q1, q2)
 
         def value_loss_fn(value_params, batch, target):
-            value = (1-batch.done)*self.value.apply(value_params, batch.state)
+            value = self.value.apply(value_params, batch.state)
             return 0.5*mse_loss(value, target)
 
-        value_grads = jax.grad(value_loss_fn)(value_params, batch, (q-log_probs).mean(axis=1))
+        value_loss, value_grads = jax.value_and_grad(value_loss_fn)(value_params, batch, q-log_probs)
         value_updates, value_opt_state = self.value_opt.update(value_grads, value_opt_state)
         value_params = optax.apply_updates(value_params, value_updates)
+        logger.debug('value_loss ' + f'{value_loss}')
+        logger.debug('value_grad ' + f'{jnp.linalg.norm(value_grads["value_network/~/linear_0"]["w"][:, 0])}')
         return value_params, value_opt_state
 
     def _update_actor(self, actor_params, actor_opt_state, key, state):
@@ -189,7 +203,7 @@ class SACAgent():
             q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
             q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
             q = jnp.minimum(q1, q2)
-            return (log_probs - q).mean()
+            return (log_probs-q).mean()
 
         actor_loss, actor_grads = jax.value_and_grad(actor_loss_fn)(
             actor_params, state
@@ -197,26 +211,41 @@ class SACAgent():
 
         actor_updates, actor_opt_state = self.actor_opt.update(actor_grads, actor_opt_state)
         actor_params = optax.apply_updates(actor_params, actor_updates)
+        logger.debug('actor_loss ' + f'{actor_loss}')
+        logger.debug('actor_grad ' + f'{jnp.linalg.norm(actor_grads["actor_network/~/linear_0"]["w"][:, 0])}')
         return actor_loss, actor_params, actor_opt_state
 
     def _update_q(self, q1_params, q1_opt_state, q2_params, q2_opt_state, batch):
         # Reward scale. Read 5.2 of the SAC paper.
+
+        # Compute next_Q instead of using the value function ?
+        # self.rng, key = jax.random.split(self.rng, 2)
+        # actions, log_probs = self.select_actions(self.actor_params, batch.next_state, key)
+        # state_action_input = jnp.concatenate((batch.next_state, actions), axis=1)
+        # q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
+        # q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
+        # next_q = jnp.minimum(q1, q2)
         q_hat = batch.reward * self.reward_scale + (1-batch.done)*self.discount*\
-                (self.value.apply(self.value_target_params, batch.next_state)).mean()
+                (jax.lax.stop_gradient(self.value.apply(self.value_target_params, batch.next_state))).mean(axis=1)
+                # next_q
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
             q_r = self.Q.apply(q_params, state_action_input)  # _r is for replay buffer
             return 0.5*mse_loss(q_r, q_hat)
 
         # Compute loss using actions from replay buffer
-        q1_grads = jax.grad(q_loss)(q1_params, q_hat, batch.state, batch.action)
+        q1_loss, q1_grads = jax.value_and_grad(q_loss)(q1_params, q_hat, batch.state, batch.action)
         q1_updates, q1_opt_state = self.Q1_opt.update(q1_grads, q1_opt_state)
         q1_params = optax.apply_updates(q1_params, q1_updates)
 
-        q2_grads = jax.grad(q_loss)(q2_params, q_hat, batch.state, batch.action)
+        q2_loss, q2_grads = jax.value_and_grad(q_loss)(q2_params, q_hat, batch.state, batch.action)
         q2_updates, q2_opt_state = self.Q2_opt.update(q2_grads, q2_opt_state)
         q2_params = optax.apply_updates(q2_params, q2_updates)
 
+        logger.debug('q1_loss ' + f'{q1_loss}')
+        logger.debug('q2_loss ' + f'{q2_loss}')
+        logger.debug('q1_grad ' + f'{jnp.linalg.norm(q1_grads["critic_network/~/linear_0"]["w"][:, 0])}')
+        logger.debug('q2_grad ' + f'{jnp.linalg.norm(q2_grads["critic_network/~/linear_0"]["w"][:, 0])}')
         return q1_params, q1_opt_state, q2_params, q2_opt_state
 
     def learner_step(self):
@@ -249,7 +278,7 @@ class SACAgent():
             lambda params, target_params: self.tau*params + (1-self.tau)*target_params,
             self.value_params, self.value_target_params)
 
-        return actor_loss
+        return None
 
 class RandomAgent():
     def __init__(self,

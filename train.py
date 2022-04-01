@@ -8,6 +8,7 @@ from agents import SACAgent, RandomAgent
 from dm_env import StepType
 import yaml
 import IPython
+from utils import logger
 
 
 def evaluate(environment, agent, evaluation_episodes):
@@ -48,17 +49,22 @@ def display_video(frames, filename='temp.mp4', frame_repeat=4):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='./configs/example.yaml', type=str)
-    parser.add_argument('--r_scale', default=1., type=float)
     args = parser.parse_args()
     with open(Path(args.config), 'r') as f:
         config_args = yaml.safe_load(f.read())
-    env = eval(config_args['env'])(for_evaluation=False)
+
     n_trajectories = config_args['n_trajectories']
     seed = config_args['seed']
+
+    env = eval(config_args['env'])(for_evaluation=False)
+
+    print('Observation shape : ', (env.observation_spec().shape[0]))
+    print('Action shape : ', (env.action_spec().shape[0]))
+    print('Parameters : ', config_args)
     rng = jax.random.PRNGKey(seed)
 
-    config_args['agent_kwargs']['reward_scale'] = args.r_scale
-    agent = SACAgent(rng, env.observation_spec, env.action_spec, **config_args['agent_kwargs'])
+    logger.info("Creating SAC agent")
+    agent = SACAgent(rng, env.observation_spec, env.action_spec, jit=False, **config_args['agent_kwargs'])
     # agent = RandomAgent(rng, env.observation_spec, env.action_spec)
 
     best_reward = 0   # env.reward_spec().minimum() ?  # should be min reward possible
@@ -69,13 +75,17 @@ if __name__ == '__main__':
     save_every = config_args['save_interval']
     eval_every = config_args['eval_interval']
 
+    logger.info('Beginning training')
     for i in range(1, n_trajectories+1):
+        logger.debug('trajectory ' + f'{i}')
         timestep = env.reset()
         traj_reward = 0
         n_steps = 0
         while timestep.step_type != StepType.LAST and n_steps <= max_steps:
-            action = agent.select_action(timestep.observation)
-            # print(round(action[0], 2), "\t", end="")
+            logger.debug('step ' + f'{n_steps}')
+            action = agent.select_action(timestep.observation, logging=True)
+            logger.debug('reward ' + f'{timestep.reward}') if timestep.reward is not None else 0
+            logger.debug('action ' + f'{round(action[0], 3)}')
             timestep_ = env.step(action)  # underscore denotes timestep t+1
             agent.record(timestep, action, timestep_)
             traj_reward += timestep_.reward
@@ -83,9 +93,10 @@ if __name__ == '__main__':
             n_steps += 1
 
             if n_steps % train_every == 0 and len(agent.memory) >= agent.batch_size:
-                actor_loss = agent.learner_step()
-        print(f"Trajectory\t{i}/{n_trajectories}")
-        print(f"Reward \t {traj_reward}, Best \t {best_reward}")
+                agent.learner_step()
+        logger.debug('trajectory_reward ' + f'{traj_reward}')
+        logger.info(f"Trajectory\t{i}/{n_trajectories}")
+        logger.info(f"Reward \t {traj_reward}, Best \t {best_reward}")
         if i % eval_every == 0:
             evaluate(env, agent, evaluation_episodes=5)
 
