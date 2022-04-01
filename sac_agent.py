@@ -219,7 +219,7 @@ class SACAgent():
         # next_q = jnp.minimum(q1, q2)
         q_hat = batch.reward  * self.reward_scale + (1-batch.done)*self.discount*\
                 (jax.lax.stop_gradient(self.value.apply(self.value_target_params, batch.next_state))).mean(axis=1)
-                 # next_q
+                # next_q
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
             q_r = self.Q.apply(q_params, state_action_input)  # _r is for replay buffer
