@@ -23,21 +23,5 @@ After training, you can plot results by running
 python plot.py to_plot.log
 ```
 
-## Resources 
-# TODO 
+## Original SAC Paper 
 https://arxiv.org/abs/1801.01290
-# TODO
-
-
-
-## Troubleshooting
-
-The mujuco environments may lead to some issues (for Ubuntu at least) :
-
-* <code>fatal error: GL/osmesa.h: No such file or directory</code>
-
-install : <code>sudo apt-get install libosmesa6-dev</code>
-
-* <code>FileNotFoundError: [Errno 2] No such file or directory: 'patchelf'</code>
-
-install : <code>sudo apt-get install patchelf</code>
