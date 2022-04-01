@@ -3,6 +3,7 @@ import base64
 from pathlib import Path
 from envs import *
 import jax
+import jax.numpy as jnp
 import sys
 from agents import SACAgent, RandomAgent
 from dm_env import StepType
@@ -11,14 +12,14 @@ import IPython
 from utils import logger
 
 
-def evaluate(environment, agent, evaluation_episodes):
+def evaluate(environment, agent, evaluation_episodes, max_steps):
   frames = []
   avg_rew = 0.
   for episode in range(evaluation_episodes):
     timestep = environment.reset()
     episode_return = 0
     steps = 0
-    while not timestep.last():
+    while not timestep.last() and steps < max_steps:
 
       action = agent.select_action(timestep.observation, deterministic=True)
       timestep = environment.step(action)
@@ -62,6 +63,7 @@ if __name__ == '__main__':
     print('Action shape : ', (env.action_spec().shape[0]))
     print('Parameters : ', config_args)
     rng = jax.random.PRNGKey(seed)
+    np.random.seed(seed)
 
     logger.info("Creating SAC agent")
     agent = SACAgent(rng, env.observation_spec, env.action_spec, jit=False, **config_args['agent_kwargs'])
@@ -84,7 +86,6 @@ if __name__ == '__main__':
         while timestep.step_type != StepType.LAST and n_steps <= max_steps:
             logger.debug('step ' + f'{n_steps}')
             action = agent.select_action(timestep.observation, logging=True)
-            logger.debug('reward ' + f'{timestep.reward}') if timestep.reward is not None else 0
             logger.debug('action ' + f'{round(action[0], 3)}')
             timestep_ = env.step(action)  # underscore denotes timestep t+1
             agent.record(timestep, action, timestep_)
@@ -92,13 +93,16 @@ if __name__ == '__main__':
             timestep = timestep_
             n_steps += 1
 
-            if n_steps % train_every == 0 and len(agent.memory) >= agent.batch_size:
+            if n_steps % train_every == 0: # and len(agent.memory) >= agent.batch_size:
                 agent.learner_step()
+                logger.debug('value ' + f'{agent.value.apply(agent.value_params, timestep.observation)[0]}')
+                logger.debug('q ' + f"{agent.Q.apply(agent.Q1_params, jnp.concatenate((timestep.observation, action), axis=-1))[0]}")
+
         logger.debug('trajectory_reward ' + f'{traj_reward}')
         logger.info(f"Trajectory\t{i}/{n_trajectories}")
         logger.info(f"Reward \t {traj_reward}, Best \t {best_reward}")
         if i % eval_every == 0:
-            evaluate(env, agent, evaluation_episodes=5)
+            evaluate(env, agent, evaluation_episodes=5, max_steps=max_steps)
 
         if i % save_every == 0:
             agent.save_checkpoint('dir_save')

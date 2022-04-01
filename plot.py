@@ -48,7 +48,7 @@ def plot_actions():
 
 if __name__=='__main__':
     for identifier in ['reward', 'trajectory_reward', 'actor_loss', 'value_loss', 'actor_grad',
-                       'value_grad', 'mus', 'sigmas', 'action', 'log_probs']:
+                       'value_grad', 'mus', 'sigmas', 'action', 'log_probs', 'value', 'q']:
         plt.plot(parse_log_file(identifier), label=identifier)
         plt.legend()
         plt.show()

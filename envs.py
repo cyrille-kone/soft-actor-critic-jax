@@ -96,8 +96,7 @@ class PusherEnv(MixinEnv):
         self._nb_episodes = 0
 
     def action_spec(self) -> specs.BoundedArray:
-        return specs.BoundedArray(shape=(1,), dtype=np.float32, minimum=-1., maximum=1.)
-
+        return specs.BoundedArray(shape=(1,), dtype=np.float32, minimum=-1., maximum=1.) 
     def observation_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(shape=(2,), dtype=np.float32, minimum=[-1, -np.inf], maximum=[1., np.inf])
 
@@ -167,3 +166,33 @@ class ReacherEnv(MixinEnv):
 
     def action_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(shape=(2,), minimum=-1., maximum=1., dtype=np.float32)
+
+class DebugEnv(MixinEnv):
+    """
+    An extremely simple continuous environment to debug our agent
+    """
+    def __init__(self, for_evaluation: bool) -> None:
+        super().__init__(for_evaluation)
+        self._state = np.array([2*np.random.rand()-1])  # state in [-1, 1]
+
+    def step(self, action: chex.ArrayNumpy) -> dm_env.TimeStep:
+        action = action
+        new_state = self._state + 0.01*(action > self._state) - 0.01*(action<self._state)
+        new_state = new_state.clip(-1, 1)
+        reward = (1 - np.abs(new_state*action)).squeeze(0)  # get state and action close to zero to maximise reward
+        done = (0.01 > new_state) * (new_state > -0.01)  # done if state is close to 0
+        if done:
+            return dm_env.termination(reward, new_state)
+        return dm_env.transition(reward, new_state)
+
+    def observation_spec(self) -> specs.BoundedArray:
+        return specs.BoundedArray(shape=(1,), minimum=-1., maximum=1., dtype=np.float32)
+
+    def action_spec(self) -> specs.BoundedArray:
+        return specs.BoundedArray(shape=(1,), minimum=-1., maximum=1., dtype=np.float32)
+
+    def reset(self):
+        self._state = np.array([2*np.random.rand()-1])
+        return dm_env.restart(self._state)
+
+

@@ -82,7 +82,7 @@ class SACAgent():
         self.Q2_opt_state = self.Q2_opt.init(self.Q2_params)
         self.actor_opt_state = self.actor_opt.init(self.actor_params)
 
-        if jit:
+        if jit:  # disable jit to print stuff from inside functions when debugging
             # jax.jit some functions
             self.update_value = jax.jit(self._update_value)
             self.update_actor = jax.jit(self._update_actor)
@@ -124,7 +124,6 @@ class SACAgent():
         # squash actions to enforce action bounds
         # (see appendix C in SAC paper)
         actions = jnp.tanh(actions) * self.action_spec().maximum
-
         # compute log_likelihood of the sampled actions
         log_probs = -0.5*jnp.log(2*jnp.pi) - log_sigmas - 0.5*((actions-mus)/jnp.exp(log_sigmas))**2
 
@@ -225,8 +224,8 @@ class SACAgent():
         # q1 = jax.lax.stop_gradient(self.Q.apply(self.Q1_params, state_action_input))
         # q2 = jax.lax.stop_gradient(self.Q.apply(self.Q2_params, state_action_input))
         # next_q = jnp.minimum(q1, q2)
-        q_hat = batch.reward * self.reward_scale + (1-batch.done)*self.discount*\
-                (jax.lax.stop_gradient(self.value.apply(self.value_target_params, batch.next_state))).mean(axis=1)
+        q_hat = batch.reward#  * self.reward_scale + (1-batch.done)*self.discount*\
+                # (jax.lax.stop_gradient(self.value.apply(self.value_target_params, batch.next_state))).mean(axis=1)
                 # next_q
         def q_loss(q_params, q_hat, state, action):
             state_action_input = jnp.concatenate((state, action), axis=1)
@@ -254,17 +253,18 @@ class SACAgent():
         batch = self.memory.sample_batch(self.batch_size, key)
 
         self.rng, key = jax.random.split(self.rng, 2)
-        # update value network
-        self.value_params, self.value_opt_state = self.update_value(
-            self.value_params, self.value_opt_state,
-            key, batch
-        )
 
         # update critic (Q) networks
         self.Q1_params, self.Q1_opt_state, self.Q2_params, self.Q2_opt_state = self.update_q(
             self.Q1_params, self.Q1_opt_state,
             self.Q2_params, self.Q2_opt_state,
             batch
+        )
+
+        # update value network
+        self.value_params, self.value_opt_state = self.update_value(
+            self.value_params, self.value_opt_state,
+            key, batch
         )
 
         # update actor network
