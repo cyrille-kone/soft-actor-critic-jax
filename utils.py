@@ -22,6 +22,14 @@ file_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
 file_handler.setLevel(logging.DEBUG)
 logger.addHandler(file_handler)
 
+#           ------------- Plotting ---------------
+#
+# The logger's 'DEBUG' level outputs parsable information for future plotting.
+# Running plot.py will parse the file to_plot.log and plot
+# relevant data about the training
+#
+#           --------------------------------------
+
 def load_config(*argkeys, **IGNORE):
     r'''
      Read a key from the config file
