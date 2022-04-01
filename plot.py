@@ -27,7 +27,11 @@ def plot_q_grads(file='to_plot.log'):
 
 
 if __name__=='__main__':
-    file = sys.argv[1]
+    if len(sys.argv) >= 2:
+        file = sys.argv[1]
+    else:
+        file = 'to_plot.log'
+
     for identifier in ['reward', 'trajectory_reward', 'actor_loss', 'value_loss', 'actor_grad',
                        'value_grad', 'mus', 'sigmas', 'action', 'log_probs', 'value', 'q']:
         plt.plot(parse_log_file(identifier, file=file), label=identifier)

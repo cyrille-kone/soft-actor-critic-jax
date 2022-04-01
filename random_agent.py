@@ -10,7 +10,7 @@ class RandomAgent():
         self.memory = [0]
         self.batch_size = 0
 
-    def select_action(self, obs, deterministic=False):
+    def select_action(self, obs, deterministic=False, logging=True):
         self.rng, key = jax.random.split(self.rng, 2)
         return jax.random.uniform(key, self.action_spec().shape)
 

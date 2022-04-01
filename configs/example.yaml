@@ -1,11 +1,13 @@
-env: InvertedPendulumEnv
+env: DebugEnv
+agent: RandomAgent  # or RandomAgent
 seed: 0
 n_trajectories: 2000
-max_steps_per_episode: 150
+max_steps_per_episode: 15
 train_interval: 1
 save_interval: 100
 eval_interval: 10
 max_thread: -1
+
 
 agent_kwargs:
   batch_size: 256
@@ -16,4 +18,5 @@ agent_kwargs:
   discount: 0.99
   tau: 0.005
   target_period_update: 1
-  reward_scale: 5.
+  reward_scale: 1.
+  jit: False
