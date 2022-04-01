@@ -67,8 +67,11 @@ if __name__ == '__main__':
     np.random.seed(seed)
 
     logger.info("Creating SAC agent")
-    agent = SACAgent(rng, env.observation_spec, env.action_spec, jit=False, **config_args['agent_kwargs'])
-    # agent = RandomAgent(rng, env.observation_spec, env.action_spec)
+
+    if config_args['agent'] == 'SACAgent':
+        agent = SACAgent(rng, env.observation_spec, env.action_spec, **config_args['agent_kwargs'])
+    elif config_args['agent'] == 'RandomAgent':
+        agent = RandomAgent(rng, env.observation_spec, env.action_spec)
 
     best_reward = -1e9
 
@@ -95,8 +98,9 @@ if __name__ == '__main__':
 
             if n_steps % train_every == 0:
                 agent.learner_step()
-                logger.debug('value ' + f'{agent.value.apply(agent.value_params, timestep.observation)[0]}')
-                logger.debug('q ' + f"{agent.Q.apply(agent.Q1_params, jnp.concatenate((timestep.observation, action), axis=-1))[0]}")
+                if config_args['agent'] == 'SACAgent':
+                    logger.debug('value ' + f'{agent.value.apply(agent.value_params, timestep.observation)[0]}')
+                    logger.debug('q ' + f"{agent.Q.apply(agent.Q1_params, jnp.concatenate((timestep.observation, action), axis=-1))[0]}")
 
         logger.debug('trajectory_reward ' + f'{traj_reward}')
         logger.info(f"Trajectory\t{i}/{n_trajectories}")
